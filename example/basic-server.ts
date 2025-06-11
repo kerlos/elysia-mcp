@@ -71,27 +71,15 @@ const app = new Elysia()
       },
       enableLogging: true,
       setupServer: async (server: McpServer) => {
-        // Register tools directly using MCP SDK patterns
+        // Register tools directly using MCP SDK patterns with Zod schemas
         server.tool(
           'calculate',
           {
-            type: 'object',
-            properties: {
-              operation: {
-                type: 'string',
-                enum: ['add', 'subtract', 'multiply', 'divide'],
-                description: 'The arithmetic operation to perform',
-              },
-              a: {
-                type: 'number',
-                description: 'First number',
-              },
-              b: {
-                type: 'number',
-                description: 'Second number',
-              },
-            },
-            required: ['operation', 'a', 'b'],
+            operation: z
+              .enum(['add', 'subtract', 'multiply', 'divide'])
+              .describe('The arithmetic operation to perform'),
+            a: z.number().describe('First number'),
+            b: z.number().describe('Second number'),
           },
           async (args) => {
             const result = await exampleService.calculate(
@@ -107,19 +95,15 @@ const app = new Elysia()
           }
         );
 
-        // Simple add tool following MCP SDK pattern
+        // Simple add tool following MCP SDK pattern with Zod schema
         server.tool(
           'add',
           {
-            type: 'object',
-            properties: {
-              a: { type: 'number', description: 'First number' },
-              b: { type: 'number', description: 'Second number' },
-            },
-            required: ['a', 'b'],
+            a: z.number().describe('First number'),
+            b: z.number().describe('Second number'),
           },
           async (args) => {
-            const { a, b } = args as { a: number; b: number };
+            const { a, b } = args;
 
             // Basic validation
             if (typeof a !== 'number' || typeof b !== 'number') {
@@ -132,35 +116,19 @@ const app = new Elysia()
           }
         );
 
-        server.tool(
-          'get_time',
-          {
-            type: 'object',
-            properties: {},
-            required: [],
-          },
-          async () => {
-            return {
-              content: [{ type: 'text', text: new Date().toISOString() }],
-            };
-          }
-        );
+        server.tool('get_time', {}, async () => {
+          return {
+            content: [{ type: 'text', text: new Date().toISOString() }],
+          };
+        });
 
         server.tool(
           'echo',
           {
-            type: 'object',
-            properties: {
-              text: {
-                type: 'string',
-                minLength: 1,
-                description: 'Text to echo back',
-              },
-            },
-            required: ['text'],
+            text: z.string().min(1).describe('Text to echo back'),
           },
           async (args) => {
-            const { text } = args as { text: string };
+            const { text } = args;
 
             if (!text || typeof text !== 'string') {
               throw new Error(
@@ -174,44 +142,32 @@ const app = new Elysia()
           }
         );
 
-        // Advanced tool with complex validation
+        // Advanced tool with complex validation using Zod schema
         server.tool(
           'validate_user',
           {
-            type: 'object',
-            properties: {
-              user: {
-                type: 'object',
-                properties: {
-                  name: { type: 'string', minLength: 2 },
-                  email: { type: 'string', format: 'email' },
-                  age: { type: 'number', minimum: 0, maximum: 150 },
-                  preferences: {
-                    type: 'object',
-                    properties: {
-                      theme: { type: 'string', enum: ['light', 'dark'] },
-                      notifications: { type: 'boolean' },
-                    },
-                  },
-                },
-                required: ['name', 'email', 'age'],
-              },
-            },
-            required: ['user'],
+            user: z.object({
+              name: z
+                .string()
+                .min(2)
+                .describe('User name with at least 2 characters'),
+              email: z.string().email().describe('Valid email address'),
+              age: z.number().min(0).max(150).describe('Age between 0 and 150'),
+              preferences: z
+                .object({
+                  theme: z
+                    .enum(['light', 'dark'])
+                    .describe('UI theme preference'),
+                  notifications: z
+                    .boolean()
+                    .describe('Notification preference'),
+                })
+                .optional(),
+            }),
           },
           async (args) => {
-            const { user } = args as {
-              user: {
-                name: string;
-                email: string;
-                age: number;
-                preferences: {
-                  theme: string;
-                  notifications: boolean;
-                };
-              };
-            };
-            // Basic validation
+            const { user } = args;
+            // Basic validation is now handled by Zod, but keeping additional checks for demonstration
             if (!user || typeof user !== 'object') {
               throw new Error('User object is required');
             }

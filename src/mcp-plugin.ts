@@ -126,6 +126,10 @@ export const mcpPlugin = (options: MCPPluginOptions = {}) => {
 
                 return transport.stream();
               }
+
+              // For non-SSE initialization, return 202 accepted
+              set.status = 202;
+              return;
             }
             // Invalid request
             set.status = 400;

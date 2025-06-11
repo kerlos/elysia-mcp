@@ -27,6 +27,7 @@ npm install elysia-mcp
 ```typescript
 import { Elysia } from 'elysia';
 import { mcpPlugin, McpServer } from 'elysia-mcp';
+import { z } from 'zod';
 
 const app = new Elysia()
   .use(
@@ -46,11 +47,7 @@ const app = new Elysia()
         server.tool(
           'echo',
           {
-            type: 'object',
-            properties: {
-              text: { type: 'string', description: 'Text to echo back' },
-            },
-            required: ['text'],
+            text: z.string().describe('Text to echo back'),
           },
           async (args) => {
             return {
@@ -110,11 +107,7 @@ Register tools using the MCP Server instance:
 server.tool(
   'tool-name',
   {
-    type: 'object',
-    properties: {
-      param: { type: 'string', description: 'Parameter description' },
-    },
-    required: ['param'],
+    param: z.string().describe('Parameter description'),
   },
   async (args) => {
     // Tool implementation
@@ -302,16 +295,16 @@ interface MCPPluginOptions {
 ## Dependencies
 
 - `@modelcontextprotocol/sdk` - Official MCP TypeScript SDK
-- `zod` - Schema validation for prompts
+- `zod` - Schema validation and type safety
 - `elysia` - Fast web framework
 
 ## Technical Details
 
 - **Protocol Version**: 2024-11-05
 - **Session Identification**: UUID-based via `Mcp-Session-Id` header
-- **Tool Registration**: `server.tool(name, schema, handler)`
+- **Tool Registration**: `server.tool(name, zodSchema, handler)`
 - **Resource Registration**: `server.resource(name, uri, handler)`
-- **Prompt Registration**: `server.prompt(name, zodSchema, handler)`
+- **Prompt Registration**: `server.prompt(name, description, zodSchema, handler)`
 - **EventSource Streaming**: For server-to-client notifications
 - **JSON-RPC 2.0 Error Handling**: Proper error codes and messages
 
@@ -319,18 +312,14 @@ interface MCPPluginOptions {
 
 ```text
 ┌─────────────────┐    ┌──────────────┐    ┌─────────────────┐
-│   HTTP Client   │───▶│ Elysia HTTP │───▶│  MCP Plugin     │
+│   HTTP Client   │───▶│ Elysia HTTP  │───▶│    MCP Plugin   │
 │                 │    │   Handler    │    │                 │
 └─────────────────┘    └──────────────┘    └─────────────────┘
                                                      │
-                                            ┌─────────────────┐
-                                            │ SSEElysiaTransport │
-                                            │ (Custom)         │
-                                            └─────────────────┘
                                                      │
                                             ┌─────────────────┐
-                                            │   McpServer     │
-                                            │ (Singleton)     │
+                                            │    McpServer    │
+                                            │   (Singleton)   │
                                             └─────────────────┘
                                                      │
                                     ┌────────────────┼────────────────┐

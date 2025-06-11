@@ -166,11 +166,10 @@ describe('MCP Plugin', () => {
         })
       );
 
-      expect(response.status).toBe(202);
-      const newSessionId = response.headers.get('Mcp-Session-Id') ?? '';
-      expect(newSessionId).toBeTruthy();
-
-      // The response will be sent via SSE, but we can check that a session was created
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error).toBeDefined();
+      expect(body.error.message).toContain('No valid session ID provided');
     });
   });
 

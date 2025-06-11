@@ -1,7 +1,8 @@
 import { describe, expect, it, beforeAll } from 'bun:test';
 import { Elysia } from 'elysia';
 import { mcpPlugin } from '../src/mcp-plugin.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 
 describe('MCP Tools Interface Testing', () => {
   let app: Elysia;
@@ -23,19 +24,15 @@ describe('MCP Tools Interface Testing', () => {
         },
         enableLogging: false, // Disable logging for tests
         setupServer: async (server: McpServer) => {
-          // Simple tools for testing - using exact same pattern as working examples
+          // Simple tools for testing - using Zod schemas
           server.tool(
             'test_add',
             {
-              type: 'object',
-              properties: {
-                a: { type: 'number', description: 'First number' },
-                b: { type: 'number', description: 'Second number' },
-              },
-              required: ['a', 'b'],
+              a: z.number().describe('First number'),
+              b: z.number().describe('Second number'),
             },
             async (args) => {
-              const { a, b } = args as { a: number; b: number };
+              const { a, b } = args;
               return {
                 content: [{ type: 'text', text: String(a + b) }],
               };
@@ -45,14 +42,10 @@ describe('MCP Tools Interface Testing', () => {
           server.tool(
             'test_echo',
             {
-              type: 'object',
-              properties: {
-                message: { type: 'string', description: 'Message to echo' },
-              },
-              required: ['message'],
+              message: z.string().describe('Message to echo'),
             },
             async (args) => {
-              const { message } = args as { message: string };
+              const { message } = args;
               return {
                 content: [{ type: 'text', text: `Echo: ${message}` }],
               };
@@ -89,7 +82,7 @@ describe('MCP Tools Interface Testing', () => {
     );
 
     expect(initResponse.status).toBe(202);
-    sessionId = initResponse.headers.get('Mcp-Session-Id')!;
+    sessionId = initResponse.headers.get('Mcp-Session-Id') ?? '';
     expect(sessionId).toBeTruthy();
   });
 
