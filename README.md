@@ -6,7 +6,7 @@ with HTTP transport support.
 
 ## Features
 
-- **HTTP Transport**: Full HTTP-based MCP transport with Server-Sent Events (SSE)
+- **HTTP Transport**: Full HTTP-based MCP transport with Streamable HTTP
 - **Session Management**: Stateful session handling via headers
 - **Type-Safe**: Built with TypeScript and Zod validation
 - **Easy Integration**: Simple plugin architecture for Elysia apps
@@ -401,7 +401,7 @@ bun test
 
 - **Initialization**: Session creation, clientInfo validation, proper JSON-RPC responses
 - **Tools Operations**: tools/list, tools/call with various parameter combinations
-- **SSE Streaming**: Event-stream headers, session validation, real-time responses
+- **Streamable HTTP**: Streamable response headers, session validation, real-time responses
 - **Session Management**: Creation, validation, termination
 - **HTTP Method Validation**: POST/GET/DELETE support, method rejection
 - **Error Handling**: Malformed JSON, missing headers, transport errors
@@ -429,7 +429,7 @@ bun test
 ```bash
 ✓ MCP Plugin > POST /mcp - Initialization > should successfully initialize MCP session
 ✓ MCP Plugin > POST /mcp - Tools Operations > should handle tools/list request
-✓ MCP Plugin > GET /mcp - SSE Streaming > should return SSE stream for valid session
+✓ MCP Plugin > GET /mcp - Streamable HTTP > should return streamable HTTP for valid session
 ✓ MCP Tools Interface Testing > Tool Calls > should handle basic tool call
   request format
 ✓ MCP Tools Interface Testing > Session Management > should reject tool
@@ -459,7 +459,7 @@ interface MCPPluginOptions {
 ### Endpoints
 
 - **POST `/mcp`** - JSON-RPC 2.0 interface (initialize + method calls)
-- **GET `/mcp`** - Server-Sent Events streaming
+- **GET `/mcp`** - Streamable HTTP streaming
 - **DELETE `/mcp`** - Session termination
 
 ### Headers
@@ -480,7 +480,7 @@ interface MCPPluginOptions {
 - **Tool Registration**: `server.tool(name, zodSchema, handler)`
 - **Resource Registration**: `server.resource(name, uri, handler)`
 - **Prompt Registration**: `server.prompt(name, description, zodSchema, handler)`
-- **EventSource Streaming**: For server-to-client notifications
+- **Streamable HTTP**: For server-to-client notifications
 - **JSON-RPC 2.0 Error Handling**: Proper error codes and messages
 
 ## Architecture
