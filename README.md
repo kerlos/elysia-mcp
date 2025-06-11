@@ -101,6 +101,29 @@ bun run example
 bun run dev
 ```
 
+**Multiple Servers Example:**
+
+```bash
+# Run the multiple MCP servers example (port 3000)
+bun example:multi
+```
+
+This example demonstrates how to create multiple MCP plugins in a single Elysia application:
+
+- **Math Operations Plugin** (`/math`) - Basic arithmetic tools:
+
+  - `add` - Add two numbers
+  - `multiply` - Multiply two numbers
+  - `power` - Calculate base to the power of exponent
+
+- **Text Utilities Plugin** (`/text`) - Text processing tools:
+  - `uppercase` - Convert text to uppercase
+  - `word_count` - Count words in text
+  - `reverse` - Reverse text characters
+  - `replace` - Replace text with global matching
+
+Visit `http://localhost:3000/` for API documentation and usage examples.
+
 ### Testing with MCP Inspector
 
 1. Install MCP Inspector:
@@ -110,8 +133,10 @@ bun run dev
    ```
 
 2. Connect to your server:
-   - Transport: `http`
-   - URL: `http://localhost:3000/mcp`
+   - **Basic Example**: `http://localhost:3000/mcp`
+   - **Multiple Servers Example**:
+     - Math Plugin: `http://localhost:3000/math`
+     - Text Plugin: `http://localhost:3000/text`
 
 ### Configuration Options
 

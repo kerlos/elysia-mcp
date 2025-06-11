@@ -17,6 +17,7 @@
   "scripts": {
     "dev": "bun run --watch example/basic-server.ts",
     "example": "bun run example/basic-server.ts",
+    "example:multi": "bun run example/multiple-server.ts",
     "build": "bun run build.ts",
     "prepublishOnly": "bun run build",
     "lint": "bunx biome lint ./src",
