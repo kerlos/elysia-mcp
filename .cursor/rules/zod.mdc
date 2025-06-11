@@ -1,0 +1,1075 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+TITLE: Overwrite Transformations Retaining Schema Type in Zod 4
+DESCRIPTION: Introduces the new `.overwrite()` method in Zod v4, designed for transformations that do not change the inferred type. This method returns an instance of the original schema class, allowing continued method chaining and retaining introspectability.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+z.number().overwrite(val => val ** 2).max(100);
+// => ZodNumber
+```
+
+----------------------------------------
+
+TITLE: Compose Discriminated Unions in Zod 4
+DESCRIPTION: Demonstrates the new ability in Zod v4 to use one discriminated union schema (`MyErrors`) as a member within another discriminated union (`MyResult`), enabling powerful schema composition patterns.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+const BaseError = z.object({ status: z.literal("failed"), message: z.string() });
+const MyErrors = z.discriminatedUnion("code", [
+  BaseError.extend({ code: z.literal(400) }),
+  BaseError.extend({ code: z.literal(401) }),
+  BaseError.extend({ code: z.literal(500) })
+]);
+
+const MyResult = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("success"), data: z.string() }),
+  MyErrors
+]);
+```
+
+----------------------------------------
+
+TITLE: Defining Synchronous Zod-Validated Functions in Zod v4
+DESCRIPTION: Demonstrates the new API for defining Zod-validated functions using `z.function()` in Zod v4. It shows how to define input and output schemas upfront and implement the function logic synchronously using `.implement()`.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+const myFunction = z.function({
+  input: [z.object({
+    name: z.string(),
+    age: z.number().int(),
+  })],
+  output: z.string(),
+});
+
+myFunction.implement((input) => {
+  return `Hello ${input.name}, you are ${input.age} years old.`;
+});
+```
+
+----------------------------------------
+
+TITLE: Use Top-Level String Format Functions - Zod v4 - JavaScript
+DESCRIPTION: Lists the various string format validation functions (like email, uuid, url, etc.) that are now available directly as top-level methods on the `z` module in Zod v4. This change makes them more concise to use and improves tree-shaking.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+z.email();\nz.uuidv4();\nz.uuidv7();\nz.uuidv8();\nz.ipv4();\nz.ipv6();\nz.cidrv4();\nz.cidrv6();\nz.url();\nz.e164();\nz.base64();\nz.base64url();\nz.jwt();\nz.ascii();\nz.utf8();\nz.lowercase();\nz.iso.date();\nz.iso.datetime();\nz.iso.duration();\nz.iso.time();
+```
+
+----------------------------------------
+
+TITLE: Zod 4: Using .check() in zod/v4-mini
+DESCRIPTION: Illustrates the use of the new `.check()` method available in `zod/v4-mini`, which allows composing multiple validations and transforms (referred to as 'checks') on a schema.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { z } from "zod/v4-mini";
+
+z.string().check(
+  z.minLength(10),
+  z.maxLength(100),
+  z.toLowerCase(),
+  z.trim(),
+);
+```
+
+----------------------------------------
+
+TITLE: Customize Required and Invalid Type Errors with Zod 4
+DESCRIPTION: Shows how Zod v4 replaces the separate `required_error` and `invalid_type_error` parameters with a single `error` function that receives an issue object, allowing conditional error messages based on the issue type (e.g., `invalid_type` or `required`).
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+// Zod 3
+- z.string({
+-   required_error: "This field is required"
+-   invalid_type_error: "Not a string",
+- });
+```
+
+LANGUAGE: TypeScript
+CODE:
+```
+// Zod 4
++ z.string({ error: (issue) => issue.input === undefined ?
++  "This field is required" :
++  "Not a string"
++ });
+```
+
+----------------------------------------
+
+TITLE: Customize Errors with Function Syntax in Zod 4
+DESCRIPTION: Illustrates how Zod v4 replaces the `errorMap` function with the unified `error` function for more complex error customization, allowing access to the issue details to return specific messages based on validation failures like `too_small`.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+// Zod 3
+- z.string({
+-   errorMap: (issue, ctx) => {
+-     if (issue.code === "too_small") {
+-       return { message: `Value must be >${issue.minimum}` };
+-     }
+-     return { message: ctx.defaultError };
+-   },
+- });
+```
+
+LANGUAGE: TypeScript
+CODE:
+```
+// Zod 4
++ z.string({
++   error: (issue) => {
++     if (issue.code === "too_small") {
++       return `Value must be >${issue.minimum}`
++     }
++   },
++ });
+```
+
+----------------------------------------
+
+TITLE: Adding Issues Directly to ZodError (JavaScript)
+DESCRIPTION: Shows the recommended way to add new issues to a `ZodError` instance in Zod v4 by directly pushing to the `issues` array, replacing the deprecated `.addIssue()` methods.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: JavaScript
+CODE:
+```
+myError.issues.push({
+  // new issue
+});
+```
+
+----------------------------------------
+
+TITLE: Configure Zod Error Message Locale - Zod v4 - JavaScript
+DESCRIPTION: Shows how to configure the locale for Zod error messages using the new `z.locales` API. Demonstrates setting the English locale using `z.config(z.locales.en())`. This allows for internationalization of validation errors.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+import { z } from "zod/v4";\n\n// configure English locale (default)\nz.config(z.locales.en());
+```
+
+----------------------------------------
+
+TITLE: Migrating from ZodObject Methods to Top-Level Functions (Zod 4)
+DESCRIPTION: Shows how to replace the deprecated `.strict()` and `.passthrough()` methods on `ZodObject` with the new top-level `z.strictObject()` and `z.looseObject()` functions in Zod 4.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: javascript
+CODE:
+```
+// Zod 3
+z.object({ name: z.string() }).strict();
+z.object({ name: z.string() }).passthrough();
+
+// Zod 4
+z.strictObject({ name: z.string() });
+z.looseObject({ name: z.string() });
+```
+
+----------------------------------------
+
+TITLE: Chain Zod Object Schema Operations (Extend/Omit)
+DESCRIPTION: Demonstrates repeatedly chaining `.extend()` and `.omit()` operations on a Zod object schema, highlighting performance improvements in Zod v4 for complex type manipulations and avoiding compiler issues.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: typescript
+CODE:
+```
+import { z } from "zod/v4";
+
+export const a = z.object({
+  a: z.string(),
+  b: z.string(),
+  c: z.string(),
+});
+
+export const b = a.omit({
+  a: true,
+  b: true,
+  c: true,
+});
+
+export const c = b.extend({
+  a: z.string(),
+  b: z.string(),
+  c: z.string(),
+});
+
+export const d = c.omit({
+  a: true,
+  b: true,
+  c: true,
+});
+
+export const e = d.extend({
+  a: z.string(),
+  b: z.string(),
+  c: z.string(),
+});
+
+export const f = e.omit({
+  a: true,
+  b: true,
+  c: true,
+});
+
+export const g = f.extend({
+  a: z.string(),
+  b: z.string(),
+  c: z.string(),
+});
+
+export const h = g.omit({
+  a: true,
+  b: true,
+  c: true,
+});
+
+export const i = h.extend({
+  a: z.string(),
+  b: z.string(),
+  c: z.string(),
+});
+
+export const j = i.omit({
+  a: true,
+  b: true,
+  c: true,
+});
+
+export const k = j.extend({
+  a: z.string(),
+  b: z.string(),
+  c: z.string(),
+});
+
+export const l = k.omit({
+  a: true,
+  b: true,
+  c: true,
+});
+
+export const m = l.extend({
+  a: z.string(),
+  b: z.string(),
+  c: z.string(),
+});
+
+export const n = m.omit({
+  a: true,
+  b: true,
+  c: true,
+});
+
+export const o = n.extend({
+  a: z.string(),
+  b: z.string(),
+  c: z.string(),
+});
+
+export const p = o.omit({
+  a: true,
+  b: true,
+  c: true,
+});
+
+export const q = p.extend({
+  a: z.string(),
+  b: z.string(),
+  c: z.string(),
+});
+```
+
+----------------------------------------
+
+TITLE: Defining Asynchronous Zod-Validated Functions in Zod v4
+DESCRIPTION: Shows how to define an asynchronous Zod-validated function in Zod v4 using the new `.implementAsync()` method on the function factory returned by `z.function()`.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+myFunction.implementAsync(async (input) => {
+  return `Hello ${input.name}, you are ${input.age} years old.`;
+});
+```
+
+----------------------------------------
+
+TITLE: Define Zod Object Schemas with Extend
+DESCRIPTION: Defines two Zod object schemas, where the second schema `B` extends the first schema `A`, demonstrating schema composition and its impact on TypeScript compiler performance in Zod v4.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: typescript
+CODE:
+```
+import { z } from "zod/v4";
+
+export const A = z.object({
+  a: z.string(),
+  b: z.string(),
+  c: z.string(),
+  d: z.string(),
+  e: z.string(),
+});
+
+export const B = A.extend({
+  f: z.string(),
+  g: z.string(),
+  h: z.string(),
+});
+```
+
+----------------------------------------
+
+TITLE: Refinements Allowing Method Chaining in Zod 4
+DESCRIPTION: Demonstrates the improvement in Zod v4 where refinements are stored internally within the original schema type, allowing seamless chaining of other schema methods like `.min()` after applying `.refine()`, as expected.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+z.string()
+  .refine(val => val.includes("@"))
+  .min(5); // ✅
+```
+
+----------------------------------------
+
+TITLE: Apply Refinements with Zod Mini .check()
+DESCRIPTION: Illustrates the use of the general-purpose .check() method in 'zod/v4-mini' to apply multiple refinements, such as minLength, maxLength, and custom logic via z.refine(), to a schema.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { z } from "zod/v4-mini";
+
+z.array(z.number()).check(
+  z.minLength(5),
+  z.maxLength(10),
+  z.refine(arr => arr.includes(5))
+);
+```
+
+----------------------------------------
+
+TITLE: Using z.enum with Native Enum in Zod v4
+DESCRIPTION: Demonstrates the new usage of `z.enum()` in Zod v4, which now directly accepts a TypeScript native enum as input, replacing the deprecated `z.nativeEnum()`.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+enum Color {
+  Red = "red",
+  Green = "green",
+  Blue = "blue",
+}
+
+const ColorSchema = z.enum(Color); // ✅
+```
+
+----------------------------------------
+
+TITLE: Using Top-Level String Format Validators (Zod 4)
+DESCRIPTION: Demonstrates the new top-level API for string format validation in Zod 4, replacing method-based validation for various formats like email, uuid, url, etc.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: javascript
+CODE:
+```
+z.email();
+z.uuid();
+z.url();
+z.emoji();         // validates a single emoji character
+z.base64();
+z.base64url();
+z.nanoid();
+z.cuid();
+z.cuid2();
+z.ulid();
+z.ipv4();
+z.ipv6();
+z.cidrv4();          // ip range
+z.cidrv6();          // ip range
+z.iso.date();
+z.iso.time();
+z.iso.datetime();
+z.iso.duration();
+```
+
+----------------------------------------
+
+TITLE: Transformations Changing Schema Type in Zod 3/4
+DESCRIPTION: Illustrates how the `.transform()` method in Zod changes the schema's inferred type to `ZodPipe`, indicating that the output type is determined by the transform function and is not introspectable as the original schema type at runtime.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+const Squared = z.number().transform(val => val ** 2);
+// => ZodPipe<ZodNumber, ZodTransform>
+```
+
+----------------------------------------
+
+TITLE: Pretty-Print Zod Error - Zod v4 - JavaScript
+DESCRIPTION: Demonstrates the usage of the new top-level `z.prettifyError` function to convert a `ZodError` instance into a human-readable, multi-line string format. Shows how to create a sample `ZodError` with multiple validation issues and then prettify it for easier debugging or user display.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+const myError = new z.ZodError([\n  {\n    code: 'unrecognized_keys',\n    keys: [ 'extraField' ],\n    path: [],\n    message: 'Unrecognized key: "extraField"'\n  },\n  {\n    expected: 'string',\n    code: 'invalid_type',\n    path: [ 'username' ],\n    message: 'Invalid input: expected string, received number'\n  },\n  {\n    origin: 'number',\n    code: 'too_small',\n    minimum: 0,\n    inclusive: true,\n    path: [ 'favoriteNumbers', 1 ],\n    message: 'Too small: expected number to be >=0'\n  }\n]);\n\nz.prettifyError(myError);
+```
+
+----------------------------------------
+
+TITLE: Validate File Instances - Zod v4 - JavaScript
+DESCRIPTION: Demonstrates how to create a Zod schema specifically for validating `File` instances using `z.file()`. Shows how to apply constraints on file size using `min()` and `max()` and validate the MIME type using `type()`. Requires a `File` object as input.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+const fileSchema = z.file();\n\nfileSchema.min(10_000); // minimum .size (bytes)\nfileSchema.max(1_000_000); // maximum .size (bytes)\nfileSchema.type("image/png"); // MIME type
+```
+
+----------------------------------------
+
+TITLE: Define Literals with Multiple Values in Zod 4
+DESCRIPTION: Explains the new feature in Zod v4 where `z.literal()` can accept an array of values, providing a more concise way to define schemas that match one of several literal values compared to the Zod 3 approach using `z.union` with multiple `z.literal` calls.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+const httpCodes = z.literal([ 200, 201, 202, 204, 206, 207, 208, 226 ]);
+```
+
+LANGUAGE: TypeScript
+CODE:
+```
+// previously in Zod 3:
+const httpCodes = z.union([
+  z.literal(200),
+  z.literal(201),
+  z.literal(202),
+  z.literal(204),
+  z.literal(206),
+  z.literal(207),
+  z.literal(208),
+  z.literal(226)
+]);
+```
+
+----------------------------------------
+
+TITLE: Available Top-Level Refinements in Zod Mini
+DESCRIPTION: Lists the various top-level refinement functions provided by 'zod/v4-mini', covering custom checks, standard validation checks for different data types, and value transformation functions.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { z } from "zod/v4-mini";
+
+// custom checks
+z.refine();
+
+// first-class checks
+z.lt(value);
+z.lte(value); // alias: z.maximum()
+z.gt(value);
+z.gte(value); // alias: z.minimum()
+z.positive();
+z.negative();
+z.nonpositive();
+z.nonnegative();
+z.multipleOf(value);
+z.maxSize(value);
+z.minSize(value);
+z.size(value);
+z.maxLength(value);
+z.minLength(value);
+z.length(value);
+z.regex(regex);
+z.lowercase();
+z.uppercase();
+z.includes(value);
+z.startsWith(value);
+z.endsWith(value);
+z.property(key, schema); // for object schemas; check `input[key]` against `schema`
+z.mime(value); // for file schemas (see below)
+
+// overwrites (these *do not* change the inferred type!)
+z.overwrite(value => newValue);
+z.normalize();
+z.trim();
+z.toLowerCase();
+z.toUpperCase();
+```
+
+----------------------------------------
+
+TITLE: Define Recursive Object Type - Zod v4 - JavaScript
+DESCRIPTION: Demonstrates the new Zod v4 pattern for defining recursive object types using a getter for the recursive property. Shows how to infer the TypeScript type from the schema. This approach eliminates the need for type casting used in previous versions.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+const Category = z.object({\n  name: z.string(),\n  get subcategories(){\n    return z.array(Category)\n  }\n});\n\ntype Category = z.infer<typeof Category>;\n// { name: string; subcategories: Category[] }
+```
+
+----------------------------------------
+
+TITLE: Customize Simple String Errors with Zod 4
+DESCRIPTION: Demonstrates the change from using the deprecated `message` parameter to the new unified `error` parameter for providing simple string error messages directly within validation options in Zod v4.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+- z.string().min(5, { message: "Too short." });
+```
+
+LANGUAGE: TypeScript
+CODE:
+```
++ z.string().min(5, { error: "Too short." });
+```
+
+----------------------------------------
+
+TITLE: Use Standard Zod Methods on Recursive Schemas - Zod v4 - JavaScript
+DESCRIPTION: Illustrates that recursive Zod schemas created with the new v4 pattern are regular `ZodObject` instances and fully support standard methods like `pick()`, `partial()`, and `extend()` for schema manipulation.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+Post.pick({ title: true })\nPost.partial();\nPost.extend({ publishDate: z.date() });
+```
+
+----------------------------------------
+
+TITLE: Add Metadata to Global Registry using .meta()
+DESCRIPTION: Shows the preferred and most convenient way to add metadata to the z.globalRegistry by using the .meta() method directly on a schema object, passing the metadata object as an argument.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+z.string().meta({
+  id: "email_address",
+  title: "Email address",
+  description: "Provide your email",
+  examples: ["naomie@example.com"],
+  // ...
+});
+```
+
+----------------------------------------
+
+TITLE: Accessing Enum Values in Zod v4
+DESCRIPTION: Shows the canonical way to access enum values from a Zod enum schema (`.enum`) in Zod v4 and highlights the removal of deprecated access methods (`.Enum`, `.Values`).
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+ColorSchema.enum.Red; // ✅ => "Red" (canonical API)
+ColorSchema.Enum.Red; // ❌ removed
+ColorSchema.Values.Red; // ❌ removed
+```
+
+----------------------------------------
+
+TITLE: Include Metadata in Zod to JSON Schema Conversion - Zod v4 - JavaScript
+DESCRIPTION: Illustrates how Zod metadata added via `.describe()` or `.meta()` is automatically incorporated into the generated JSON Schema when using `z.toJSONSchema()`. Shows an example with description, title, and examples metadata included in the output.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+const mySchema = z.object({\n  firstName: z.string().describe("Your first name"),\n  lastName: z.string().meta({ title: "last_name" }),\n  age: z.number().meta({ examples: [12, 99] }),\n});\n\nz.toJSONSchema(mySchema);\n// => {\n//   type: 'object',\n//   properties: {\n//     firstName: { type: 'string', description: 'Your first name' },\n//     lastName: { type: 'string', title: 'last_name' },\n//     age: { type: 'number', examples: [ 12, 99 ] }\n//   },\n//   required: [ 'firstName', 'lastName', 'age' ]\n// }
+```
+
+----------------------------------------
+
+TITLE: Define Discriminated Unions with Complex Discriminators in Zod 4
+DESCRIPTION: Shows the enhanced `z.discriminatedUnion` in Zod v4, demonstrating its new capability to handle discriminator properties defined using more complex schema types like unions (`z.union`) or nested objects, in addition to simple literals.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+const MyResult = z.discriminatedUnion("status", [
+  // simple literal
+  z.object({ status: z.literal("aaa"), data: z.string() }),
+  // union discriminator
+  z.object({ status: z.union([z.literal("bbb"), z.literal("ccc")]) }),
+  // pipe discriminator
+  z.object({ status: z.object({ value: z.literal("fail") }) }),
+]);
+```
+
+----------------------------------------
+
+TITLE: Demonstrating Zod v4 Error Map Precedence (JavaScript)
+DESCRIPTION: Illustrates the change in error map precedence in Zod v4, showing that schema-level error maps now override contextual error maps passed to `.parse()`.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: JavaScript
+CODE:
+```
+const mySchema = z.string({ error: () => "Schema-level error" });
+
+// in Zod 3
+mySchema.parse(12, { error: () => "Contextual error" }); // => "Contextual error"
+
+// in Zod 4
+mySchema.parse(12, { error: () => "Contextual error" }); // => "Schema-level error"
+```
+
+----------------------------------------
+
+TITLE: Configuring Custom Email Regex in Zod (JavaScript)
+DESCRIPTION: Demonstrates how to use the z.email() schema with different predefined regex patterns provided by Zod, such as the default, HTML5, RFC 5322, and Unicode email regexes. This allows for varying levels of email validation strictness.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+// Zod's default email regex (Gmail rules)
+// see colinhacks.com/essays/reasonable-email-regex
+z.email(); // z.regexes.email
+
+// the regex used by browsers to validate input[type=email] fields
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/email
+z.email({ pattern: z.regexes.html5Email });
+
+// the classic emailregex.com regex (RFC 5322)
+z.email({ pattern: z.regexes.rfc5322Email });
+
+// a loose regex that allows Unicode (good for intl emails)
+z.email({ pattern: z.regexes.unicodeEmail });
+```
+
+----------------------------------------
+
+TITLE: Coercing Strings to Booleans with z.stringbool (JavaScript)
+DESCRIPTION: Explains and demonstrates the basic usage of the z.stringbool() schema for coercing specific string values ("true", "1", "yes", etc.) into boolean true or false. It shows examples of successful parsing for various truthy and falsy string inputs.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+const strbool = z.stringbool();
+
+strbool.parse("true")         // => true
+strbool.parse("1")            // => true
+strbool.parse("yes")          // => true
+strbool.parse("on")           // => true
+strbool.parse("y")            // => true
+strbool.parse("enable")       // => true
+
+strbool.parse("false");       // => false
+strbool.parse("0");            // => false
+strbool.parse("no");           // => false
+strbool.parse("off");          // => false
+strbool.parse("n");            // => false
+strbool.parse("disabled");     // => false
+
+strbool.parse(/* anything else */); // ZodError<[{ code: "invalid_value" }]>
+```
+
+----------------------------------------
+
+TITLE: Comparing Zod 3 Method vs Zod 4 Top-Level String Validation
+DESCRIPTION: Shows the deprecated method-based string format validation from Zod 3 compared to the recommended top-level API in Zod 4 for formats like email.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: javascript
+CODE:
+```
+z.string().email(); // ❌ deprecated
+z.email(); // ✅
+```
+
+----------------------------------------
+
+TITLE: Convert Zod Object Schema to JSON Schema - Zod v4 - JavaScript
+DESCRIPTION: Demonstrates how to use the new `z.toJSONSchema()` function to convert a basic Zod object schema into its corresponding JSON Schema representation. Requires importing `z` from "zod/v4". The output shows the structure of the generated JSON Schema.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+import { z } from "zod/v4";\n\nconst mySchema = z.object({name: z.string(), points: z.number()});\n\nz.toJSONSchema(mySchema);\n// => {\n//   type: "object",\n//   properties: {\n//     name: {type: "string"},\n//     points: {type: "number"},\n//   },\n//   required: ["name", "points"],\n// }
+```
+
+----------------------------------------
+
+TITLE: Defining Zod Issue Base Interface (TypeScript)
+DESCRIPTION: Defines the base interface `$ZodIssueBase` that all Zod issues conform to, specifying common properties like `code`, `input`, `path`, and `message`.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+export interface $ZodIssueBase {
+  readonly code?: string;
+  readonly input?: unknown;
+  readonly path: PropertyKey[];
+  readonly message: string;
+}
+```
+
+----------------------------------------
+
+TITLE: Defining Template Literal Schemas with Zod (JavaScript)
+DESCRIPTION: Illustrates the use of z.templateLiteral() to create schemas that validate strings matching a template pattern. It shows how to combine literal strings with other Zod schemas (like z.string(), z.number(), and z.enum()) within the template structure.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+const hello = z.templateLiteral(["hello, ", z.string()]);
+// `hello, ${string}`
+
+const cssUnits = z.enum(["px", "em", "rem", "%"]);
+const css = z.templateLiteral([z.number(), cssUnits]);
+// `${number}px` | `${number}em` | `${number}rem` | `${number}%`
+
+const email = z.templateLiteral([
+  z.string().min(1),
+  "@",
+  z.string().max(64),
+]);
+// `${string}@${string}` (the min/max refinements are enforced!)
+```
+
+----------------------------------------
+
+TITLE: Replacing Deprecated z.string().ip() with Separate Methods (Zod)
+DESCRIPTION: Illustrates the replacement of the deprecated `z.string().ip()` method with the new `z.ipv4()` and `z.ipv6()` top-level functions in Zod 4.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: javascript
+CODE:
+```
+z.string().ip() // ❌
+z.ipv4() // ✅
+z.ipv6() // ✅
+```
+
+----------------------------------------
+
+TITLE: Compare .describe() and .meta() for Metadata
+DESCRIPTION: Compares the older .describe() method, retained for Zod 3 compatibility, with the new .meta() method, demonstrating that .meta() is the modern and preferred way to add description metadata to the global registry.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+z.string().describe("An email address");
+
+// equivalent to
+z.string().meta({ description: "An email address" });
+```
+
+----------------------------------------
+
+TITLE: Define Mutually Recursive Object Types - Zod v4 - JavaScript
+DESCRIPTION: Shows how to define mutually recursive Zod object types, where one schema references another and vice versa, using getters for the recursive properties. This allows for complex, interconnected data structures.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+const User = z.object({\n  email: z.email(),\n  get posts(){\n    return z.array(Post)\n  }\n});\n\nconst Post = z.object({\n  title: z.string(),\n  get author(){\n    return User\n  }\n});
+```
+
+----------------------------------------
+
+TITLE: Parse Data using Zod Mini
+DESCRIPTION: Shows that parsing methods like .parse(), .safeParse(), .parseAsync(), and .safeParseAsync() are still available as methods on schemas in 'zod/v4-mini', functioning identically to the standard Zod API.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { z } from "zod/v4-mini";
+
+z.string().parse("asdf");
+z.string().safeParse("asdf");
+await z.string().parseAsync("asdf");
+await z.string().safeParseAsync("asdf");
+```
+
+----------------------------------------
+
+TITLE: Add Metadata to Zod Global Registry
+DESCRIPTION: Illustrates adding metadata to Zod's built-in global registry (z.globalRegistry), which is designed to store common JSON Schema-compatible properties like id, title, description, and examples.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+z.globalRegistry.add(z.string(), {
+  id: "email_address",
+  title: "Email address",
+  description: "Provide your email",
+  examples: ["naomie@example.com"],
+  extraKey: "Additional properties are also allowed"
+});
+```
+
+----------------------------------------
+
+TITLE: Zod 4: ZodType Generic Inference Example
+DESCRIPTION: Provides an example demonstrating how the updated `ZodType` generic structure in Zod 4 allows generic functions involving `z.ZodType` to infer types more intuitively.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+function inferSchema<T extends z.ZodType>(schema: T): T {
+  return schema;
+};
+
+inferSchema(z.string()); // z.ZodString
+```
+
+----------------------------------------
+
+TITLE: Using Fixed-Width Number Formats in Zod (JavaScript)
+DESCRIPTION: Shows how to use Zod's new numeric format methods (z.int, z.float32, z.float64, z.int32, z.uint32) to define schemas for fixed-width integer and float types. These methods automatically apply appropriate minimum and maximum constraints.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+z.int();      // [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
+z.float32();  // [-3.4028234663852886e38, 3.4028234663852886e38]
+z.float64();  // [-1.7976931348623157e308, 1.7976931348623157e308]
+z.int32();    // [-2147483648, 2147483647]
+z.uint32();   // [0, 4294967295]
+```
+
+----------------------------------------
+
+TITLE: Define Schemas with Zod Mini Functional API
+DESCRIPTION: Demonstrates the functional API of 'zod/v4-mini' using wrapper functions like z.optional(), z.union(), and z.extend() to define schema structures, which aids in tree-shaking.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { z } from "zod/v4-mini";
+
+z.optional(z.string());
+
+z.union([z.string(), z.number()]);
+
+z.extend(z.object({ /* ... */ }), { age: z.number() });
+```
+
+----------------------------------------
+
+TITLE: Using BigInt Number Formats in Zod (JavaScript)
+DESCRIPTION: Demonstrates the use of Zod's bigint format methods (z.int64, z.uint64) for defining schemas that handle integer types exceeding JavaScript's safe number range. These methods return ZodBigInt instances with predefined min/max constraints.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+z.int64();    // [-9223372036854775808n, 9223372036854775807n]
+z.uint64();   // [0n, 18446744073709551615n]
+```
+
+----------------------------------------
+
+TITLE: Defining Zod v4 Issue Formats Type (TypeScript)
+DESCRIPTION: Defines the union type `IssueFormats` using Zod v4's streamlined issue types, including new types for `z.record`, `z.map`, and `z.set`.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { z } from "zod/v4"; // v4
+
+type IssueFormats =
+  | z.core.$ZodIssueInvalidType
+  | z.core.$ZodIssueTooBig
+  | z.core.$ZodIssueTooSmall
+  | z.core.$ZodIssueInvalidStringFormat
+  | z.core.$ZodIssueNotMultipleOf
+  | z.core.$ZodIssueUnrecognizedKeys
+  | z.core.$ZodIssueInvalidValue
+  | z.core.$ZodIssueInvalidUnion
+  | z.core.$ZodIssueInvalidKey // new: used for z.record/z.map
+  | z.core.$ZodIssueInvalidElement // new: used for z.map/z.set
+  | z.core.$ZodIssueCustom;
+```
+
+----------------------------------------
+
+TITLE: Zod 4: Defining Standalone Transforms with z.transform()
+DESCRIPTION: Shows how to create a standalone transformation schema using the new `z.transform()` function, which can be used independently to parse and transform input values.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { z } from "zod/v4";
+
+const schema = z.transform(input => String(input));
+
+schema.parse(12); // => "12"
+```
+
+----------------------------------------
+
+TITLE: Refinements Breaking Method Chaining in Zod 3
+DESCRIPTION: Shows a limitation in Zod 3 where applying `.refine()` returned a `ZodEffects` type, which did not have the methods of the original schema (like `.min()`), thus preventing subsequent chaining of those methods.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+z.string()
+  .refine(val => val.includes("@"))
+  .min(5);
+// ^ ❌ Property 'min' does not exist on type ZodEffects<ZodString, string, string>
+```
+
+----------------------------------------
+
+TITLE: Basic Schema Definition and Parsing with Zod Mini
+DESCRIPTION: A simple example demonstrating how to define a boolean schema and parse a value using 'zod/v4-mini', used to highlight the reduced bundle size achieved with this variant.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { z } from "zod/v4-mini";
+
+const schema = z.boolean();
+schema.parse(false);
+```
+
+----------------------------------------
+
+TITLE: Zod 4: Record with Enum Keys (Exact Type)
+DESCRIPTION: Shows the updated behavior of `z.record()` with an enum key schema in Zod version 4. The inferred type is an exact object, and Zod enforces exhaustiveness during parsing.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+const myRecord = z.record(z.enum(["a", "b", "c"]), z.number());
+// { a: number; b: number; c: number; }
+```
+
+----------------------------------------
+
+TITLE: z.record() Requires Two Arguments in Zod v4
+DESCRIPTION: Illustrates the change in `z.record()` usage in Zod v4, which now requires both key and value schemas as arguments, unlike Zod 3 where a single argument for the value schema was accepted.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+// Zod 3
+z.record(z.string()); // ✅
+
+// Zod 4
+z.record(z.string()); // ❌
+z.record(z.string(), z.string()); // ✅
+```
+
+----------------------------------------
+
+TITLE: Register Schema with Metadata using .register()
+DESCRIPTION: Presents a convenient alternative to the add method, showing how to use the .register() method directly on a schema object to add it along with its metadata to a specified registry.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+emailSchema.register(myRegistry, { title: "Email address", description: "..." })
+// => returns emailSchema
+```
+
+----------------------------------------
+
+TITLE: Representing Non-Empty Arrays with z.tuple() in Zod v4
+DESCRIPTION: Shows how to use `z.tuple()` with a rest argument in Zod v4 to achieve the type inference `[string, ...string[]]`, which was previously associated with `z.array().nonempty()` in Zod 3.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+z.tuple([z.string()], z.string());
+// => [string, ...string[]]
+```
+
+----------------------------------------
+
+TITLE: Replacing Deprecated z.string().cidr() with Separate Methods (Zod)
+DESCRIPTION: Illustrates the replacement of the deprecated `z.string().cidr()` method with the new `z.cidrv4()` and `z.cidrv6()` top-level functions in Zod 4.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: javascript
+CODE:
+```
+z.string().cidr() // ❌
+z.cidrv4() // ✅
+z.cidrv6() // ✅
+```
+
+----------------------------------------
+
+TITLE: Add and Get Metadata from Custom Zod Registry
+DESCRIPTION: Demonstrates adding a schema and its corresponding metadata object to a custom registry using the add method and subsequently retrieving that metadata using the get method.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+const emailSchema = z.string().email();
+
+myRegistry.add(emailSchema, { title: "Email address", description: "..." });
+myRegistry.get(emailSchema);
+// => { title: "Email address", ... }
+```

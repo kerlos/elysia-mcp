@@ -1,0 +1,64 @@
+{
+  "name": "elysia-mcp",
+  "version": "1.0.0",
+  "description": "ElysiaJS plugin for Model Context Protocol with HTTP transport and stateful sessions",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "DEBUG=http bun run --watch example/basic-server.ts",
+    "build": "bun build src/index.ts --outdir ./dist --target bun --format esm && tsc --declaration --emitDeclarationOnly --outDir dist",
+    "example": "bun run example/basic-server.ts",
+    "lint": "bunx biome lint ./src",
+    "lint:fix": "bunx biome lint --write ./src",
+    "test": "bun test",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "elysia",
+    "mcp",
+    "model-context-protocol",
+    "http",
+    "streaming",
+    "json-rpc",
+    "typescript",
+    "plugin"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.25.58"
+  },
+  "peerDependencies": {
+    "elysia": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "^1.2.15",
+    "elysia": "latest",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/[your-username]/elysia-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/[your-username]/elysia-mcp/issues"
+  },
+  "homepage": "https://github.com/[your-username]/elysia-mcp#readme"
+}

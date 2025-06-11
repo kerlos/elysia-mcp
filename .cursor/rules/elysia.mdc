@@ -1,0 +1,1385 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+TITLE: Elysia Supported Schema Validation Types
+DESCRIPTION: Elysia provides declarative schema support for various parts of an HTTP request and response, enabling robust validation and automatic OpenAPI generation.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/essential/validation.md#_snippet_3
+
+LANGUAGE: APIDOC
+CODE:
+```
+Schema Types:
+  Body: Validate an incoming HTTP Message
+  Query: Query string or URL parameter
+  Params: Path parameters
+  Headers: Headers of the request
+  Cookie: Cookie of the request
+  Response: Response of the request
+```
+
+----------------------------------------
+
+TITLE: Elysia.js User Authentication and Session Management Service
+DESCRIPTION: Provides a comprehensive user authentication service built with Elysia.js. It defines in-memory state for users and sessions, models for sign-in credentials and cookies, a custom macro for authentication checks, and routes for user sign-up, sign-in, and sign-out, including password hashing and session token management.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/tutorial.md#_snippet_41
+
+LANGUAGE: typescript
+CODE:
+```
+// @errors: 2538
+import { Elysia, t } from 'elysia'
+
+export const userService = new Elysia({ name: 'user/service' })
+    .state({
+        user: {} as Record<string, string>,
+        session: {} as Record<number, string>
+    })
+    .model({
+        signIn: t.Object({
+            username: t.String({ minLength: 1 }),
+            password: t.String({ minLength: 8 })
+        }),
+        session: t.Cookie(
+            {
+                token: t.Number()
+            },
+            {
+                secrets: 'seia'
+            }
+        ),
+        optionalSession: t.Cookie(
+            {
+                token: t.Optional(t.Number())
+            },
+            {
+                secrets: 'seia'
+            }
+        )
+    })
+    .macro({
+        isSignIn(enabled: boolean) {
+            if (!enabled) return
+
+            return {
+                beforeHandle({
+                    status,
+                    cookie: { token },
+                    store: { session }
+                }) {
+                    if (!token.value)
+                        return status(401, {
+                            success: false,
+                            message: 'Unauthorized'
+                        })
+
+                    const username = session[token.value as unknown as number]
+
+                    if (!username)
+                        return status(401, {
+                            success: false,
+                            message: 'Unauthorized'
+                        })
+                }
+            }
+        }
+    })
+
+export const getUserId = new Elysia()
+    .use(userService)
+    .guard({
+        isSignIn: true,
+        cookie: 'session'
+    })
+    .resolve(({ store: { session }, cookie: { token } }) => ({
+        username: session[token.value]
+    }))
+    .as('scoped')
+
+export const user = new Elysia({ prefix: '/user' })
+    .use(userService)
+    .put(
+        '/sign-up',
+        async ({ body: { username, password }, store, status }) => {
+            if (store.user[username])
+                return status(400, {
+                    success: false,
+                    message: 'User already exists'
+                })
+
+            store.user[username] = await Bun.password.hash(password)
+
+            return {
+                success: true,
+                message: 'User created'
+            }
+        },
+        {
+            body: 'signIn'
+        }
+    )
+    .post(
+        '/sign-in',
+        async ({
+            store: { user, session },
+            status,
+            body: { username, password },
+            cookie: { token }
+        }) => {
+            if (
+                !user[username] ||
+                !(await Bun.password.verify(password, user[username]))
+            )
+                return status(400, {
+                    success: false,
+                    message: 'Invalid username or password'
+                })
+
+            const key = crypto.getRandomValues(new Uint32Array(1))[0]
+            session[key] = username
+            token.value = key
+
+            return {
+                success: true,
+                message: `Signed in as ${username}`
+            }
+        },
+        {
+            body: 'signIn',
+            cookie: 'optionalSession'
+        }
+    )
+    .get(
+        '/sign-out',
+        ({ cookie: { token } }) => {
+            token.remove()
+
+            return {
+                success: true,
+                message: 'Signed out'
+            }
+        },
+        {
+            cookie: 'optionalSession'
+        }
+    )
+    .use(getUserId)
+    .get('/profile', ({ username }) => ({
+        success: true,
+
+```
+
+----------------------------------------
+
+TITLE: Basic Elysia Server with Routes, Files, Streams, and WebSockets
+DESCRIPTION: This snippet sets up a basic Elysia server demonstrating various functionalities: a simple 'Hello World' GET route, serving a static file, streaming responses, and a WebSocket endpoint for real-time communication. The server listens on port 3000.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/index.md#_snippet_4
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia, file } from 'elysia'
+
+new Elysia()
+	.get('/', 'Hello World')
+	.get('/image', file('mika.webp'))
+	.get('/stream', function* () {
+		yield 'Hello'
+		yield 'World'
+	})
+	.ws('/realtime', {
+		message(ws, message) {
+			ws.send('got:' + message)
+		}
+	})
+	.listen(3000)
+```
+
+----------------------------------------
+
+TITLE: Configure Cookie Plugin for User Session Storage in ElysiaJS
+DESCRIPTION: This snippet shows how to integrate the `@elysiajs/cookie` plugin into an ElysiaJS application to manage user sessions. It configures `httpOnly` for security and provides commented-out options for `secure`, `sameSite`, and `signed` cookies, which are crucial for storing `access_token` and `refresh_token` from Supabase.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/blog/elysia-supabase.md#_snippet_10
+
+LANGUAGE: TypeScript
+CODE:
+```
+// src/modules/authen.ts
+import { Elysia, t } from 'elysia'
+import { cookie } from '@elysiajs/cookie'
+
+import { supabase } from '../../libs'
+
+const authen = (app: Elysia) =>
+    app.group('/auth', (app) =>
+        app
+            .use(
+                cookie({
+                    httpOnly: true,
+                    // If you need cookie to deliver via https only
+                    // secure: true,
+                    //
+                    // If you need a cookie to be available for same-site only
+                    // sameSite: "strict",
+                    //
+                    // If you want to encrypt a cookie
+                    // signed: true,
+                    // secret: process.env.COOKIE_SECRET,
+                })
+            )
+            .setModel({
+                sign: t.Object({
+                    email: t.String({
+                        format: 'email'
+                    }),
+                    password: t.String({
+                        minLength: 8
+                    })
+                })
+            })
+            // rest of the code
+    )
+```
+
+----------------------------------------
+
+TITLE: Define GET and POST Routes in ElysiaJS
+DESCRIPTION: Illustrates how to define routes for different HTTP methods (GET and POST) on distinct paths, showing method-specific routing for a playground environment.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/essential/route.md#_snippet_2
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia } from 'elysia'
+
+const demo2 = new Elysia()
+    .get('/', () => 'hello')
+    .post('/hi', () => 'hi')
+```
+
+----------------------------------------
+
+TITLE: Create a basic Elysia.js application in TypeScript
+DESCRIPTION: Example code for `src/index.ts` demonstrating a simple Elysia.js server that listens on port 3000 and responds with 'Hello Elysia' to GET requests on the root path. It uses the `@elysiajs/node` adapter.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/quick-start.md#_snippet_8
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { Elysia } from 'elysia'
+import { node } from '@elysiajs/node'
+
+const app = new Elysia({ adapter: node() })
+	.get('/', () => 'Hello Elysia')
+	.listen(3000, ({ hostname, port }) => {
+		console.log(
+			`🦊 Elysia is running at ${hostname}:${port}`
+		)
+	})
+```
+
+----------------------------------------
+
+TITLE: Create a basic Elysia.js application in JavaScript
+DESCRIPTION: Example code for `src/index.js` demonstrating a simple Elysia.js server that listens on port 3000 and responds with 'Hello Elysia' to GET requests on the root path. It uses the `@elysiajs/node` adapter.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/quick-start.md#_snippet_13
+
+LANGUAGE: JavaScript
+CODE:
+```
+import { Elysia } from 'elysia'
+import { node } from '@elysiajs/node'
+
+const app = new Elysia({ adapter: node() })
+	.get('/', () => 'Hello Elysia')
+	.listen(3000, ({ hostname, port }) => {
+		console.log(
+			`🦊 Elysia is running at ${hostname}:${port}`
+		)
+	})
+```
+
+----------------------------------------
+
+TITLE: Create a Basic ElysiaJS Server with Multiple Routes
+DESCRIPTION: This snippet illustrates how to initialize an ElysiaJS application and define various HTTP routes. It includes a root GET endpoint, a GET endpoint with a dynamic path parameter, and a POST endpoint for handling request bodies. The server is configured to listen on port 3000.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/at-glance.md#_snippet_0
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { Elysia } from 'elysia'
+
+new Elysia()
+    .get('/', 'Hello Elysia')
+    .get('/user/:id', ({ params: { id }}) => id)
+    .post('/form', ({ body }) => body)
+    .listen(3000)
+```
+
+----------------------------------------
+
+TITLE: Basic Elysia Server Setup and Routes
+DESCRIPTION: Demonstrates how to initialize an Elysia server and define basic GET routes for returning plain text, JSON objects, and dynamic path parameters.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/midori.md#_snippet_0
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia } from 'elysia'
+
+new Elysia()
+    .get('/', 'Hello World')
+    .get('/json', {
+        hello: 'world'
+    })
+    .get('/id/:id', ({ params: { id } }) => id)
+    .listen(3000)
+```
+
+----------------------------------------
+
+TITLE: Dockerize ElysiaJS Application with Multi-Stage Binary Build
+DESCRIPTION: This Dockerfile provides a robust multi-stage build process for deploying an ElysiaJS application. It first compiles the application into a standalone binary using Bun, then copies this binary to a minimal `gcr.io/distroless/base` image, significantly reducing the final Docker image size and attack surface for production.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/patterns/deploy.md#_snippet_6
+
+LANGUAGE: dockerfile
+CODE:
+```
+FROM oven/bun AS build
+
+WORKDIR /app
+
+# Cache packages installation
+COPY package.json package.json
+COPY bun.lock bun.lock
+
+RUN bun install
+
+COPY ./src ./src
+
+ENV NODE_ENV=production
+
+RUN bun build \
+	--compile \
+	--minify-whitespace \
+	--minify-syntax \
+	--target bun \
+	--outfile server \
+	./src/index.ts
+
+FROM gcr.io/distroless/base
+
+WORKDIR /app
+
+COPY --from=build /app/server server
+
+ENV NODE_ENV=production
+
+CMD ["./server"]
+
+EXPOSE 3000
+```
+
+----------------------------------------
+
+TITLE: Create Elysia User Sign-up Endpoint with Prisma
+DESCRIPTION: TypeScript code for an Elysia server that defines a `/sign-up` POST endpoint, using Prisma Client to create new user entries in the database.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/blog/with-prisma.md#_snippet_7
+
+LANGUAGE: ts
+CODE:
+```
+import { Elysia } from 'elysia'
+import { PrismaClient } from '@prisma/client'
+
+const db = new PrismaClient()
+
+const app = new Elysia()
+    .post(
+        '/sign-up',
+        async ({ body }) => db.user.create({
+            data: body
+        })
+    )
+    .listen(3000)
+
+console.log(
+    `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
+)
+```
+
+----------------------------------------
+
+TITLE: Achieve End-to-End Type Safety with Elysia and Eden
+DESCRIPTION: This snippet demonstrates how Elysia, combined with `@elysiajs/eden` (treaty), provides end-to-end type safety from server to client. It defines a server-side PATCH endpoint with body validation and shows how the client automatically infers types for requests and responses.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/index.md#_snippet_6
+
+LANGUAGE: typescript
+CODE:
+```
+// @noErrors
+// @filename: server.ts
+import { Elysia, t } from 'elysia'
+
+const app = new Elysia()
+    .patch(
+        '/profile',
+        ({ body, status }) => {
+            if(body.age < 18)
+                return status(400, "Oh no")
+
+            return body
+        },
+        {
+            body: t.Object({
+                age: t.Number()
+            })
+        }
+    )
+    .listen(80)
+
+export type App = typeof app
+
+// @filename: client.ts
+// ---cut---
+import { treaty } from '@elysiajs/eden'
+import type { App } from './server'
+
+const api = treaty<App>('api.elysiajs.com')
+
+const { data } = await api.profile.patch({
+      // ^?
+    age: 21
+})
+```
+
+----------------------------------------
+
+TITLE: Integrate User Service for Authorization in Elysia Controller
+DESCRIPTION: This snippet demonstrates how to import `getUserId` and `userService` from a separate user module. It then integrates `userService` as a plugin and `getUserId` as a hook into the Elysia `note` controller, enabling user authentication and authorization for routes by providing the `username` context.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/tutorial.md#_snippet_31
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia, t } from 'elysia'
+import { getUserId, userService } from './user'
+
+const memo = t.Object({
+    data: t.String(),
+    author: t.String()
+})
+
+type Memo = typeof memo.static
+
+class Note {
+    constructor(
+        public data: Memo[] = [
+            {
+                data: 'Moonhalo',
+                author: 'saltyaom'
+            }
+        ]
+    ) {}
+
+    add(note: Memo) {
+        this.data.push(note)
+
+        return this.data
+    }
+
+    remove(index: number) {
+        return this.data.splice(index, 1)
+    }
+
+    update(index: number, note: Partial<Memo>) {
+        return (this.data[index] = { ...this.data[index], ...note })
+    }
+}
+
+export const note = new Elysia({ prefix: '/note' })
+    .use(userService)
+    .decorate('note', new Note())
+    .model({
+        memo: t.Omit(memo, ['author'])
+    })
+    .onTransform(function log({ body, params, path, request: { method } }) {
+        console.log(`${method} ${path}`, {
+            body,
+            params
+        })
+    })
+    .get('/', ({ note }) => note.data)
+    .use(getUserId)
+    .put(
+        '/',
+        ({ note, body: { data }, username }) =>
+            note.add({ data, author: username }),
+        {
+            body: 'memo'
+        }
+    )
+    .get(
+        '/:index',
+        ({ note, params: { index }, status }) => {
+            return note.data[index] ?? status(404, 'Not Found :(')
+        },
+        {
+            params: t.Object({
+                index: t.Number()
+            })
+        }
+    )
+    .guard({
+        params: t.Object({
+            index: t.Number()
+        })
+    })
+    .delete('/:index', ({ note, params: { index }, status }) => {
+```
+
+----------------------------------------
+
+TITLE: Migrating from `error` to `status` in Elysia
+DESCRIPTION: Elysia 1.3 deprecates the `error` function in favor of `status` for setting HTTP response codes. While `error` remains functional for a transition period (approximately 6 months), refactoring to `status` is recommended for future compatibility and adherence to the new API design.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/blog/elysia-13.md#_snippet_4
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { Elysia } from 'elysia';
+
+const app = new Elysia();
+
+// Old way: Using the deprecated 'error' function
+app.get('/old-error-route', ({ error }) => {
+  // This will still work for a transition period
+  return error(400, 'Bad Request: Invalid parameters');
+});
+
+// New way: Using the recommended 'status' function
+app.get('/new-status-route', ({ status }) => {
+  // Recommended for setting HTTP status codes
+  return status(400, 'Bad Request: Invalid parameters');
+});
+```
+
+----------------------------------------
+
+TITLE: Integrate ElysiaJS with SvelteKit Server Routes
+DESCRIPTION: This snippet demonstrates how to create an Elysia server within a SvelteKit server route file (`src/routes/[...slugs]/+server.ts`). It sets up basic GET and POST endpoints, including type validation for the POST request body, and exports handlers for SvelteKit to process incoming requests.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/integrations/sveltekit.md#_snippet_0
+
+LANGUAGE: typescript
+CODE:
+```
+// src/routes/[...slugs]/+server.ts
+import { Elysia, t } from 'elysia';
+
+const app = new Elysia()
+    .get('/', () => 'hello SvelteKit')
+    .post('/', ({ body }) => body, {
+        body: t.Object({
+            name: t.String()
+        })
+    })
+
+type RequestHandler = (v: { request: Request }) => Response | Promise<Response>
+
+export const GET: RequestHandler = ({ request }) => app.handle(request)
+export const POST: RequestHandler = ({ request }) => app.handle(request)
+```
+
+----------------------------------------
+
+TITLE: Integrate Swagger Documentation with Elysia
+DESCRIPTION: This example shows how to integrate Swagger (OpenAPI) documentation into an Elysia application using the `@elysiajs/swagger` plugin. It also demonstrates chaining multiple plugins like `character` and `auth`.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/index.md#_snippet_5
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia } from 'elysia'
+import swagger from '@elysiajs/swagger'
+
+new Elysia()
+	.use(swagger())
+	.use(character)
+	.use(auth)
+	.listen(3000)
+```
+
+----------------------------------------
+
+TITLE: Basic Elysia Swagger Plugin Usage
+DESCRIPTION: Demonstrates how to initialize an Elysia server and integrate the Swagger plugin with default settings. This setup automatically generates API documentation for defined routes, accessible via a Scalar UI at `/swagger` and the raw OpenAPI specification at `/swagger/json`.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/plugins/swagger.md#_snippet_1
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia } from 'elysia'
+import { swagger } from '@elysiajs/swagger'
+
+new Elysia()
+    .use(swagger())
+    .get('/', () => 'hi')
+    .post('/hello', () => 'world')
+    .listen(3000)
+```
+
+----------------------------------------
+
+TITLE: Returning Status Code with `status` Function in ElysiaJS
+DESCRIPTION: Demonstrates the recommended way to return a specific HTTP status code along with a response body using the dedicated `status` function in ElysiaJS.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/essential/handler.md#_snippet_11
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia } from 'elysia'
+
+new Elysia()
+    .get('/', ({ status }) => status(418, "Kirifuji Nagisa"))
+    .listen(3000)
+```
+
+----------------------------------------
+
+TITLE: Basic Elysia Handler Definition
+DESCRIPTION: Demonstrates the fundamental way to define a handler in ElysiaJS using a GET request, returning a simple 'hello world' string.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/essential/handler.md#_snippet_0
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia } from 'elysia'
+
+new Elysia()
+    // the function `() => 'hello world'` is a handler
+    .get('/', () => 'hello world')
+    .listen(3000)
+```
+
+----------------------------------------
+
+TITLE: Elysia Type Strictness with t.Object
+DESCRIPTION: Illustrates how to enforce type strictness for request bodies in Elysia using t.Object from elysia/t for a POST route, ensuring incoming data conforms to a defined schema.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/midori.md#_snippet_1
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia, t } from 'elysia'
+
+new Elysia()
+    .post(
+        '/profile',
+        // ↓ hover me ↓
+        ({ body }) => body,
+        {
+            body: t.Object({
+                username: t.String()
+            })
+        }
+    )
+    .listen(3000)
+```
+
+----------------------------------------
+
+TITLE: Define Authentication Schema and Routes with ElysiaJS and Supabase
+DESCRIPTION: This snippet demonstrates how to define a reusable schema for email and password using Elysia's `t.Object` and apply it to `/sign-up` and `/sign-in` routes. It integrates with Supabase for user authentication, handling both successful sign-up/sign-in and errors, and shows how to reference a defined schema in route bodies.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/blog/elysia-supabase.md#_snippet_9
+
+LANGUAGE: TypeScript
+CODE:
+```
+sign: t.Object({
+    email: t.String({
+        format: 'email'
+    }),
+    password: t.String({
+        minLength: 8
+    })
+})
+            })
+            .post(
+                '/sign-up',
+                async ({ body }) => {
+                    const { data, error } = await supabase.auth.signUp(body)
+
+                    if (error) return error
+                    return data.user
+                },
+                {
+                    schema: {
+                        body: 'sign'
+                    }
+                }
+            )
+            .post(
+                '/sign-in',
+                async ({ body }) => {
+                    const { data, error } =
+                        await supabase.auth.signInWithPassword(body)
+
+                    if (error) return error
+
+                    return data.user
+                },
+                {
+                    schema: {
+                        body: 'sign'
+                    }
+                }
+            )
+    )
+```
+
+----------------------------------------
+
+TITLE: Elysia Simplified Authentication with Hook Types
+DESCRIPTION: Demonstrates how the new hook types eliminate the need for nested `guard` blocks. Authentication hooks can now be applied directly to an instance with a specified hook type (e.g., `local`), simplifying code and reducing boilerplate while maintaining controlled inheritance.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/blog/elysia-10.md#_snippet_7
+
+LANGUAGE: TypeScript
+CODE:
+```
+const plugin = new Elysia()
+    .onBeforeHandle({ as: 'local' }, checkAuthSomehow)
+    .get('/profile', () => 'log hi')
+```
+
+----------------------------------------
+
+TITLE: Defining and Reusing Data Models in Elysia.js
+DESCRIPTION: This TypeScript code demonstrates how to define reusable data models for user authentication (e.g., `signIn` for username/password, `session` for cookies) using Elysia's `.model` method. These models are then referenced by name in the `body` and `cookie` schema options of `/sign-up` and `/sign-in` routes, ensuring consistent validation and type inference without duplicating schema definitions.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/tutorial.md#_snippet_20
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia, t } from 'elysia'
+
+export const user = new Elysia({ prefix: '/user' })
+    .state({
+        user: {} as Record<string, string>,
+        session: {} as Record<number, string>
+    })
+    .model({
+        signIn: t.Object({
+            username: t.String({ minLength: 1 }),
+            password: t.String({ minLength: 8 })
+        }),
+        session: t.Cookie(
+            {
+                token: t.Number()
+            },
+            {
+                secrets: 'seia'
+            }
+        ),
+        optionalSession: t.Cookie(
+            {
+                token: t.Optional(t.Number())
+            },
+            {
+                secrets: 'seia'
+            }
+        )
+    })
+    .put(
+        '/sign-up',
+        async ({ body: { username, password }, store, status }) => {
+            if (store.user[username])
+                return status(400, {
+                    success: false,
+                    message: 'User already exists'
+                })
+            store.user[username] = await Bun.password.hash(password)
+
+            return {
+                success: true,
+                message: 'User created'
+            }
+        },
+        {
+            body: 'signIn'
+        }
+    )
+    .post(
+        '/sign-in',
+        async ({
+            store: { user, session },
+            status,
+            body: { username, password },
+            cookie: { token }
+        }) => {
+            if (
+                !user[username] ||
+                !(await Bun.password.verify(password, user[username]))
+            )
+                return status(400, {
+                    success: false,
+                    message: 'Invalid username or password'
+                })
+
+            const key = crypto.getRandomValues(new Uint32Array(1))[0]
+            session[key] = username
+            token.value = key
+
+            return {
+                success: true,
+                message: `Signed in as ${username}`
+            }
+        },
+        {
+            body: 'signIn',
+            cookie: 'session'
+        }
+    )
+```
+
+----------------------------------------
+
+TITLE: Achieving End-to-End Type Safety in Elysia with Eden
+DESCRIPTION: This snippet illustrates Elysia's built-in end-to-end type safety feature using the Eden library. It demonstrates how to define a typed request body and interact with the API, ensuring type safety for both request and response data without requiring code generation.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/migrate/from-fastify.md#_snippet_18
+
+LANGUAGE: ts
+CODE:
+```
+import { Elysia, t } from 'elysia'
+import { treaty } from '@elysiajs/eden'
+
+const app = new Elysia()
+	.post('/mirror', ({ body }) => body, {
+		body: t.Object({
+			message: t.String()
+		})
+	})
+
+const api = treaty(app)
+
+const { data, error } = await api.mirror.post({
+	message: 'Hello World'
+})
+
+if(error)
+	throw error
+	//     ^?
+
+
+
+
+
+
+
+
+
+
+
+console.log(data)
+//          ^?
+
+
+
+// ---cut-after---
+console.log('ok')
+```
+
+----------------------------------------
+
+TITLE: Define an ElysiaJS Macro for Authentication
+DESCRIPTION: This snippet demonstrates how to define a custom `isSignIn` macro in ElysiaJS using `.macro`. It includes state management, model definitions for sign-in and session cookies, and implements an `beforeHandle` hook to check for user authentication based on a session token, returning a 401 status if unauthorized.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/tutorial.md#_snippet_23
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { Elysia, t } from 'elysia'
+
+export const userService = new Elysia({ name: 'user/service' })
+    .state({
+        user: {} as Record<string, string>,
+        session: {} as Record<number, string>
+    })
+    .model({
+        signIn: t.Object({
+            username: t.String({ minLength: 1 }),
+            password: t.String({ minLength: 8 })
+        }),
+        session: t.Cookie(
+            {
+                token: t.Number()
+            },
+            {
+                secrets: 'seia'
+            }
+        ),
+        optionalSession: t.Cookie(
+            {
+                token: t.Optional(t.Number())
+            },
+            {
+                secrets: 'seia'
+            }
+        )
+    })
+    .macro({
+        isSignIn(enabled: boolean) {
+            if (!enabled) return
+
+            return {
+                beforeHandle({
+                    status,
+                    cookie: { token },
+                    store: { session }
+                }) {
+                    if (!token.value)
+                        return status(401, {
+                            success: false,
+                            message: 'Unauthorized'
+                        })
+
+                    const username = session[token.value as unknown as number]
+
+                    if (!username)
+                        return status(401, {
+                            success: false,
+                            message: 'Unauthorized'
+                        })
+                }
+            }
+        }
+    })
+```
+
+----------------------------------------
+
+TITLE: Export Elysia App Type for End-to-End Type Safety
+DESCRIPTION: This snippet demonstrates how to export the type of an Elysia application. By exporting `typeof app`, developers can leverage this type definition on the client-side using Elysia's Eden library, enabling seamless end-to-end type synchronization without manual code generation.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/at-glance.md#_snippet_4
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia, t } from 'elysia'
+import { swagger } from '@elysiajs/swagger'
+
+const app = new Elysia()
+    .use(swagger())
+    .get('/user/:id', ({ params: { id } }) => id, {
+        params: t.Object({
+            id: t.Number()
+        })
+    })
+    .listen(3000)
+
+export type App = typeof app
+```
+
+----------------------------------------
+
+TITLE: Elysia.js Note Service CRUD Operations
+DESCRIPTION: Defines various routes for managing notes within an Elysia.js application. This snippet demonstrates GET, DELETE, and PATCH operations for notes, including parameter validation, error handling for 'Not Found' cases, and integration with a 'memo' body schema and 'isSignIn' guard for authenticated updates.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/tutorial.md#_snippet_39
+
+LANGUAGE: typescript
+CODE:
+```
+            body: 'memo'
+        }
+    )
+    .get(
+        '/:index',
+        ({ note, params: { index }, status }) => {
+            return note.data[index] ?? status(404, 'Not Found :(')
+        },
+        {
+            params: t.Object({
+                index: t.Number()
+            })
+        }
+    )
+    .guard({
+        params: t.Object({
+            index: t.Number()
+        })
+    })
+    .delete('/:index', ({ note, params: { index }, status }) => {
+        if (index in note.data) return note.remove(index)
+
+        return status(422)
+    })
+    .patch(
+        '/:index',
+        ({ note, params: { index }, body: { data }, status, username }) => {
+            if (index in note.data)
+                return note.update(index, { data, author: username })
+
+            return status(422)
+        },
+        {
+            isSignIn: true,
+            body: 'memo'
+        }
+    )
+```
+
+----------------------------------------
+
+TITLE: Infer TypeScript Types from TypeBox Schemas
+DESCRIPTION: Shows how to extract a TypeScript type definition from an Elysia/TypeBox schema using the `.static` property. This allows for compile-time type safety based on runtime validation schemas, reducing the need for duplicate type declarations.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/essential/validation.md#_snippet_2
+
+LANGUAGE: typescript
+CODE:
+```
+import { t } from 'elysia'
+
+const MyType = t.Object({
+	hello: t.Literal('Elysia')
+})
+
+type MyType = typeof MyType.static
+```
+
+----------------------------------------
+
+TITLE: ElysiaJS Incorrect Usage: Lack of Type Inference Without Chaining
+DESCRIPTION: This example illustrates the negative impact of not using method chaining in ElysiaJS. When methods are called separately, Elysia's type system cannot preserve new type references, leading to a complete loss of type inference. This results in potential type errors, as indicated by the `@errors: 2339` annotation.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/key-concept.md#_snippet_2
+
+LANGUAGE: typescript
+CODE:
+```
+// @errors: 2339
+import { Elysia } from 'elysia'
+
+const app = new Elysia()
+
+app.state('build', 1)
+
+app.get('/', ({ store: { build } }) => build)
+
+app.listen(3000)
+```
+
+----------------------------------------
+
+TITLE: Implement User Authentication with Elysia.js
+DESCRIPTION: This TypeScript code defines an Elysia.js plugin for user authentication, including `/sign-up` and `/sign-in` routes. It uses an in-memory store for user credentials (hashed passwords) and session management. The `/sign-up` route hashes and stores new user passwords, while `/sign-in` verifies credentials, generates a session key, and sets a secure cookie. Body validation is enforced using `t.Object`.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/tutorial.md#_snippet_19
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia, t } from 'elysia'
+
+export const user = new Elysia({ prefix: '/user' })
+    .state({
+        user: {} as Record<string, string>,
+        session: {} as Record<number, string>
+    })
+    .put(
+        '/sign-up',
+        async ({ body: { username, password }, store, status }) => {
+            if (store.user[username])
+                return status(400, {
+                    success: false,
+                    message: 'User already exists'
+                })
+            store.user[username] = await Bun.password.hash(password)
+
+            return {
+                success: true,
+                message: 'User created'
+            }
+        },
+        {
+            body: t.Object({
+                username: t.String({ minLength: 1 }),
+                password: t.String({ minLength: 8 })
+            })
+        }
+    )
+    .post(
+        '/sign-in',
+        async ({
+            store: { user, session },
+            status,
+            body: { username, password },
+            cookie: { token }
+        }) => {
+            if (
+                !user[username] ||
+                !(await Bun.password.verify(password, user[username]))
+            )
+                return status(400, {
+                    success: false,
+                    message: 'Invalid username or password'
+                })
+
+            const key = crypto.getRandomValues(new Uint32Array(1))[0]
+            session[key] = username
+            token.value = key
+
+            return {
+                success: true,
+                message: `Signed in as ${username}`
+            }
+        },
+        {
+            body: t.Object({
+                username: t.String({ minLength: 1 }),
+                password: t.String({ minLength: 8 })
+            }),
+            cookie: t.Cookie(
+                {
+                    token: t.Number()
+                },
+                {
+                    secrets: 'seia'
+                }
+            )
+        }
+    )
+```
+
+----------------------------------------
+
+TITLE: Injecting ElysiaJS Models with Reference
+DESCRIPTION: Demonstrates how to define and inject a custom body schema as a named model in ElysiaJS using its reference model feature. This method allows for better organization, auto-completion, and integration with OpenAPI clients like Swagger, while also improving TypeScript inference speed.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/essential/structure.md#_snippet_13
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia, t } from 'elysia'
+
+const customBody = t.Object({
+	username: t.String(),
+	password: t.String()
+})
+
+const AuthModel = new Elysia()
+    .model({
+        'auth.sign': customBody
+    })
+
+const UserController = new Elysia({ prefix: '/auth' })
+    .use(AuthModel)
+    .post('/sign-in', async ({ body, cookie: { session } }) => {
+                             // ^?
+
+        return true
+    }, {
+        body: 'auth.sign'
+    })
+```
+
+----------------------------------------
+
+TITLE: Recommended: Using Elysia Instance as a Service
+DESCRIPTION: This example illustrates the recommended approach for creating request-dependent services by instantiating a new Elysia instance. This method ensures type integrity and proper inference, allowing for dependency injection-like patterns and the declaration of service methods using `macro`.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/essential/structure.md#_snippet_6
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { Elysia } from 'elysia'
+
+// ✅ Do
+const AuthService = new Elysia({ name: 'Service.Auth' })
+    .derive({ as: 'scoped' }, ({ cookie: { session } }) => ({
+    	// This is equivalent to dependency injection
+        Auth: {
+            user: session.value
+        }
+    }))
+    .macro(({ onBeforeHandle }) => ({
+     	// This is declaring a service method
+        isSignIn(value: boolean) {
+            onBeforeHandle(({ Auth, status }) => {
+                if (!Auth?.user || !Auth.user) return status(401)
+            })
+        }
+    }))
+
+const UserController = new Elysia()
+    .use(AuthService)
+    .get('/profile', ({ Auth: { user } }) => user, {
+    	isSignIn: true
+    })
+```
+
+----------------------------------------
+
+TITLE: ElysiaJS Automatic Type Inference for Path Parameters
+DESCRIPTION: This example demonstrates ElysiaJS's powerful type inference system. It shows how the framework automatically infers the type of a dynamic path parameter (`:id`) within the `params` object, providing compile-time and runtime type safety without requiring explicit TypeScript declarations.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/at-glance.md#_snippet_1
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { Elysia } from 'elysia'
+
+new Elysia()
+    .get('/user/:id', ({ params: { id } }) => id)
+    .listen(3000)
+```
+
+----------------------------------------
+
+TITLE: ElysiaJS: Check User Sign-in with beforeHandle
+DESCRIPTION: This example demonstrates using the `beforeHandle` hook in ElysiaJS to validate a user's session before processing a GET request. If the session is invalid, it sets the status to 401 Unauthorized, preventing access to the route handler.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/essential/life-cycle.md#_snippet_20
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia } from 'elysia'
+import { validateSession } from './user'
+
+new Elysia()
+    .get('/', () => 'hi', {
+        beforeHandle({ set, cookie: { session }, status }) {
+            if (!validateSession(session.value)) return status(401)
+        }
+    })
+    .listen(3000)
+```
+
+----------------------------------------
+
+TITLE: Handle Dynamic Path Parameters in ElysiaJS
+DESCRIPTION: Demonstrates how to define dynamic routes with parameters (`:id`) and access them from the `params` object. Also shows a static path for the same base route, for a playground environment.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/essential/route.md#_snippet_3
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia } from 'elysia'
+
+const demo3 = new Elysia()
+	  .get('/id', () => `id: undefined`)
+    .get('/id/:id', ({ params: { id } }) => `id: ${id}`)
+```
+
+----------------------------------------
+
+TITLE: Handling Type-Safe Errors by Status Code with Elysia.js and Eden
+DESCRIPTION: Demonstrates how to define and narrow down error types based on HTTP status codes in Elysia.js on the server and handle them type-safely on the client using Eden Treaty. This ensures robust error handling and improved developer experience.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/eden/treaty/legacy.md#_snippet_6
+
+LANGUAGE: typescript
+CODE:
+```
+// server.ts
+import { Elysia, t } from 'elysia'
+
+const app = new Elysia()
+    .model({
+        nendoroid: t.Object({
+            id: t.Number(),
+            name: t.String()
+        }),
+        error: t.Object({
+            message: t.String()
+        })
+    })
+    .get('/', () => 'Hi Elysia')
+    .get('/id/:id', ({ params: { id } }) => id)
+    .post('/mirror', ({ body }) => body, {
+        body: 'nendoroid',
+        response: {
+            200: 'nendoroid',
+            400: 'error',
+            401: 'error'
+        }
+    })
+    .listen(3000)
+
+export type App = typeof app
+```
+
+LANGUAGE: typescript
+CODE:
+```
+const { data: nendoroid, error } = app.mirror.post({
+    id: 1895,
+    name: 'Skadi'
+})
+
+if(error) {
+    switch(error.status) {
+        case 400:
+        case 401:
+            // narrow down to type 'error' described in the server
+            warnUser(error.value)
+            break
+
+        default:
+            // typed as unknown
+            reportError(error.value)
+            break
+    }
+
+    throw error
+}
+```
+
+----------------------------------------
+
+TITLE: Accessing Context in ElysiaJS Route Handler
+DESCRIPTION: Demonstrates how to access the `context` object within an ElysiaJS route handler to retrieve request-specific information like the `path`.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/essential/handler.md#_snippet_6
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia } from 'elysia'
+
+new Elysia()
+	.get('/', (context) => context.path)
+```
+
+----------------------------------------
+
+TITLE: Create Basic Elysia App (src/index.ts)
+DESCRIPTION: Example TypeScript code for a minimal Elysia application that serves 'Hello Elysia' on the root path and listens on port 3000.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/quick-start.md#_snippet_3
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia } from 'elysia'
+
+const app = new Elysia()
+	.get('/', () => 'Hello Elysia')
+	.listen(3000)
+
+console.log(
+	`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
+)
+```
+
+----------------------------------------
+
+TITLE: Hello World with ElysiaJS
+DESCRIPTION: A simple 'Hello World' example demonstrating the basic setup of an ElysiaJS application, defining a GET route and listening on a port.
+SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/integrations/cheat-sheet.md#_snippet_0
+
+LANGUAGE: typescript
+CODE:
+```
+import { Elysia } from 'elysia'
+
+new Elysia()
+    .get('/', () => 'Hello World')
+    .listen(3000)
+```
