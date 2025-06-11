@@ -22,6 +22,32 @@ bun add elysia-mcp
 npm install elysia-mcp
 ```
 
+## Starter Template
+
+To quickly get started with a pre-configured Elysia MCP project, you can use our starter template:
+
+```bash
+# Create a new project from the starter template
+bun create https://github.com/kerlos/elysia-mcp-starter my-mcp-project
+
+# Navigate to the project
+cd my-mcp-project
+
+# Install dependencies
+bun install
+
+# Start development server
+bun run dev
+```
+
+The [elysia-mcp-starter](https://github.com/kerlos/elysia-mcp-starter) template includes:
+
+- Pre-configured Elysia setup with MCP plugin
+- TypeScript configuration
+- Development scripts
+- Basic project structure
+- Example MCP server implementation
+
 ## Quick Start
 
 ```typescript
