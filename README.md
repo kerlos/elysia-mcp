@@ -122,8 +122,6 @@ This example demonstrates how to create multiple MCP plugins in a single Elysia 
   - `reverse` - Reverse text characters
   - `replace` - Replace text with global matching
 
-Visit `http://localhost:3000/` for API documentation and usage examples.
-
 ### Testing with MCP Inspector
 
 1. Install MCP Inspector:
@@ -154,7 +152,7 @@ header. Each session maintains its own state and can be terminated cleanly.
 
 The plugin supports a modular handler architecture that allows you to create specialized endpoints for different MCP capabilities:
 
-````typescript
+```typescript
 import {
   mcp,
   ToolsHandler,
@@ -167,6 +165,7 @@ const app = new Elysia().use(
     /* config */
   })
 );
+```
 
 ## API Reference
 
@@ -187,7 +186,7 @@ server.tool(
     };
   }
 );
-````
+```
 
 ### Resources
 
