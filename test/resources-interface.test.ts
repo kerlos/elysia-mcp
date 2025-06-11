@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll } from 'bun:test';
 import { Elysia } from 'elysia';
-import { mcpPlugin } from '../src/mcp-plugin.js';
+import { mcp } from '../src/mcp-plugin.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
@@ -11,7 +11,7 @@ describe('MCP Resources Interface Testing', () => {
   beforeAll(async () => {
     // Create app with resources setup similar to basic-server.ts
     app = new Elysia().use(
-      mcpPlugin({
+      mcp({
         serverInfo: {
           name: 'test-resources-server',
           version: '1.0.0',

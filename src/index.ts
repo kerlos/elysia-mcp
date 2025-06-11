@@ -1,5 +1,5 @@
 // Main exports for elysia-mcp
-export { mcpPlugin } from './mcp-plugin.js';
+export { mcp } from './mcp-plugin.js';
 export { ElysiaStreamingHttpTransport as SSEElysiaTransport } from './transport.js';
 export type { MCPPluginOptions } from './mcp-plugin.js';
 

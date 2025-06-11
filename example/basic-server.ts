@@ -1,6 +1,6 @@
 import { Elysia } from 'elysia';
 import { z } from 'zod';
-import { mcpPlugin, type McpServer } from '../src/index.js';
+import { mcp, type McpServer } from '../src/index.js';
 
 // Example service class
 class ExampleService {
@@ -95,7 +95,7 @@ const MCP_BASE_PATH = '/mcp'; // Configurable base path for MCP endpoints
 // Create the Elysia app with MCP plugin
 const app = new Elysia()
   .use(
-    mcpPlugin({
+    mcp({
       basePath: MCP_BASE_PATH,
       serverInfo: {
         name: 'elysia-mcp-demo-server',

@@ -26,12 +26,12 @@ npm install elysia-mcp
 
 ```typescript
 import { Elysia } from 'elysia';
-import { mcpPlugin, McpServer } from 'elysia-mcp';
+import { mcp, McpServer } from 'elysia-mcp';
 import { z } from 'zod';
 
 const app = new Elysia()
   .use(
-    mcpPlugin({
+    mcp({
       serverInfo: {
         name: 'my-mcp-server',
         version: '1.0.0',
@@ -121,14 +121,14 @@ The plugin supports a modular handler architecture that allows you to create spe
 
 ```typescript
 import {
-  mcpPlugin,
+  mcp,
   ToolsHandler,
   ResourcesHandler,
   PromptsHandler,
 } from 'elysia-mcp';
 
 const app = new Elysia().use(
-  mcpPlugin({
+  mcp({
     /* config */
   })
 );

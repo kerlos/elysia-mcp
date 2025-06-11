@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from 'bun:test';
 import { Elysia } from 'elysia';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { mcpPlugin } from '../src/mcp-plugin.js';
+import { mcp } from '../src/mcp-plugin.js';
 import { z } from 'zod';
 
 describe('MCP Plugin', () => {
@@ -11,7 +11,7 @@ describe('MCP Plugin', () => {
   beforeAll(() => {
     // Create test app with MCP plugin
     app = new Elysia().use(
-      mcpPlugin({
+      mcp({
         serverInfo: {
           name: 'test-mcp-server',
           version: '1.0.0',
@@ -490,7 +490,7 @@ describe('MCP Plugin', () => {
     beforeAll(() => {
       // Create test app with custom basePath
       customApp = new Elysia().use(
-        mcpPlugin({
+        mcp({
           basePath: '/other-path',
           serverInfo: {
             name: 'test-custom-path-server',

@@ -18,11 +18,12 @@ export interface MCPPluginOptions {
   };
   capabilities?: ServerCapabilities;
   enableLogging?: boolean;
+  authentication?: unknown; //TODO: Add authentication type
   setupServer?: (server: McpServer) => void | Promise<void>;
 }
 
 // Main MCP plugin for Elysia
-export const mcpPlugin = (options: MCPPluginOptions = {}) => {
+export const mcp = (options: MCPPluginOptions = {}) => {
   // Create MCP server singleton
   const serverInfo = options.serverInfo || {
     name: 'elysia-mcp-server',
