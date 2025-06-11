@@ -25,6 +25,31 @@ export type ResourceContent = {
   };
 };
 
+// Resource link content type from MCP specification
+export type ResourceLinkContent = {
+  type: 'resource_link';
+  uri: string;
+  name?: string;
+  description?: string;
+  mimeType?: string;
+};
+
+// Union type for all possible content types in tool results
+export type ToolContent =
+  | TextContent
+  | ImageContent
+  | AudioContent
+  | ResourceContent
+  | ResourceLinkContent;
+
+// Tool result type that matches MCP specification exactly
+export type ToolResult = {
+  content?: ToolContent[];
+  structuredContent?: Record<string, unknown>;
+  isError?: boolean;
+};
+
+// Legacy type for backward compatibility
 export type PromptContent =
   | TextContent
   | ImageContent
@@ -36,15 +61,44 @@ export type PromptMessage = {
   content: PromptContent;
 };
 
+// Tool definition types from MCP specification
+export type ToolInputSchema = {
+  type: 'object';
+  properties: Record<string, unknown>;
+  required?: string[];
+  [key: string]: unknown;
+};
+
+export type ToolOutputSchema = {
+  type: 'object';
+  properties: Record<string, unknown>;
+  required?: string[];
+  [key: string]: unknown;
+};
+
+export type Tool = {
+  name: string;
+  description: string;
+  inputSchema: ToolInputSchema;
+  outputSchema?: ToolOutputSchema;
+  annotations?: Record<string, unknown>;
+};
+
 // Utility function inspired by FastMCP for creating image content
-export const createImageContent = (data: string, mimeType = 'image/png') => ({
+export const createImageContent = (
+  data: string,
+  mimeType = 'image/png'
+): ImageContent => ({
   type: 'image' as const,
   data,
   mimeType,
 });
 
 // Utility function for creating audio content
-export const createAudioContent = (data: string, mimeType = 'audio/wav') => ({
+export const createAudioContent = (
+  data: string,
+  mimeType = 'audio/wav'
+): AudioContent => ({
   type: 'audio' as const,
   data,
   mimeType,
@@ -55,7 +109,7 @@ export const createResourceContent = (
   uri: string,
   text: string,
   mimeType = 'application/json'
-) => ({
+): ResourceContent => ({
   type: 'resource' as const,
   resource: {
     uri,
@@ -64,8 +118,52 @@ export const createResourceContent = (
   },
 });
 
+// Utility function for creating resource link content
+export const createResourceLinkContent = (
+  uri: string,
+  name?: string,
+  description?: string,
+  mimeType?: string
+): ResourceLinkContent => ({
+  type: 'resource_link' as const,
+  uri,
+  ...(name && { name }),
+  ...(description && { description }),
+  ...(mimeType && { mimeType }),
+});
+
 // Utility function for creating text content
-export const createTextContent = (text: string) => ({
+export const createTextContent = (text: string): TextContent => ({
   type: 'text' as const,
   text,
+});
+
+// Utility function for creating a successful tool result
+export const createToolResult = (
+  content: ToolContent[],
+  structuredContent?: Record<string, unknown>
+): ToolResult => ({
+  content,
+  ...(structuredContent && { structuredContent }),
+  isError: false,
+});
+
+// Utility function for creating an error tool result
+export const createErrorToolResult = (
+  errorMessage: string,
+  structuredContent?: Record<string, unknown>
+): ToolResult => ({
+  content: [createTextContent(errorMessage)],
+  ...(structuredContent && { structuredContent }),
+  isError: true,
+});
+
+// Utility function for creating a tool result with structured content
+export const createStructuredToolResult = (
+  structuredContent: Record<string, unknown>,
+  textContent?: string
+): ToolResult => ({
+  content: textContent ? [createTextContent(textContent)] : undefined,
+  structuredContent,
+  isError: false,
 });

@@ -555,40 +555,6 @@ Examples:
       reusePort: true,
     },
     () => {
-      console.log('🦊 Simplified Elysia MCP Server running on port 3000');
-      console.log('');
-      console.log('📋 MCP Protocol Endpoints:');
-      console.log(`  🔄 Core MCP:  POST ${MCP_BASE_PATH}`);
-      console.log(`  🔧 Tools:     POST ${MCP_BASE_PATH}/tools`);
-      console.log(`  📂 Resources: POST ${MCP_BASE_PATH}/resources`);
-      console.log(`  💬 Prompts:   POST ${MCP_BASE_PATH}/prompts`);
-      console.log('');
-      console.log('📊 Feature Summary:');
-      console.log('  • 6 Tools: calculate, add, get_time, echo, validate_user');
-      console.log(
-        '  • 3 Resources: System Information, Package Configuration, Project Statistics'
-      );
-      console.log(
-        '  • 3 Enhanced Prompts: greeting, multimedia-demo, git-commit'
-      );
-      console.log(
-        '  • 🎨 Full PromptMessage Support: text, image, audio, resources'
-      );
-      console.log('');
-      console.log('🌐 Additional Endpoints:');
-      console.log('  • GET /health - Server status and modular endpoint info');
-      console.log('');
-      console.log('✨ Key Features:');
-      console.log(
-        '  • Modular handler architecture with specialized endpoints'
-      );
-      console.log('  • Type-safe PromptMessage content with utility functions');
-      console.log(
-        '  • Full multimedia support: text, images, audio, resources'
-      );
-      console.log('  • Enhanced prompts with conditional content generation');
-      console.log(
-        '  • FastMCP-inspired utility functions for content creation'
-      );
+      console.log('🦊 Elysia MCP Server running on port 3000');
     }
   );
