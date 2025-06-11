@@ -1,6 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Context } from 'elysia';
 import { BaseHandler } from './base-handler.js';
+import {
+  type JSONRPCResponseType,
+  parseJSONRPCRequest,
+} from '../utils/jsonrpc.js';
+import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * Handler for MCP tools-related requests
@@ -17,7 +22,9 @@ export class ToolsHandler extends BaseHandler {
   }: {
     request: Request;
     set: Context['set'];
-  }) {
+  }): Promise<
+    AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
+  > {
     // Log tools-specific requests if logging is enabled
     if (this.enableLogging) {
       console.log(`🔧 Tools Handler: ${request.method} ${request.url}`);
@@ -28,9 +35,14 @@ export class ToolsHandler extends BaseHandler {
     return await super.handleRequest({ request, set });
   }
 
-  protected async handlePost(request: Request, set: Context['set']) {
+  protected async handlePost(
+    request: Request,
+    set: Context['set']
+  ): Promise<
+    AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
+  > {
     try {
-      const body = await request.json();
+      const body = await parseJSONRPCRequest(request);
 
       // Add tools-specific validation or preprocessing if needed
       if (this.enableLogging && body?.method) {
@@ -40,18 +52,10 @@ export class ToolsHandler extends BaseHandler {
       return await super.handlePost(request, set);
     } catch (error) {
       set.status = 400;
-      return this.createErrorResponse('Invalid JSON in tools request');
+      return this.createErrorResponse(
+        'Invalid JSON in tools request',
+        ErrorCode.ParseError
+      );
     }
-  }
-
-  protected createErrorResponse(error: unknown, id: unknown = null) {
-    return {
-      jsonrpc: '2.0',
-      error: {
-        code: -32603,
-        message: `Tools Handler Error: ${error}`,
-      },
-      id,
-    };
   }
 }

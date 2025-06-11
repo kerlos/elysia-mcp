@@ -1,7 +1,16 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Context } from 'elysia';
 import { ElysiaStreamingHttpTransport } from '../transport.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ErrorCode,
+  isInitializeRequest,
+} from '@modelcontextprotocol/sdk/types.js';
+import {
+  createJSONRPCError,
+  createJSONRPCResponse,
+  type JSONRPCResponseType,
+  parseJSONRPCRequest,
+} from '../utils/jsonrpc.js';
 
 // Session management
 export const transports: { [sessionId: string]: ElysiaStreamingHttpTransport } =
@@ -30,7 +39,9 @@ export class BaseHandler {
   }: {
     request: Request;
     set: Context['set'];
-  }) {
+  }): Promise<
+    AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
+  > {
     const method = request.method;
 
     try {
@@ -51,8 +62,13 @@ export class BaseHandler {
     }
   }
 
-  protected async handlePost(request: Request, set: Context['set']) {
-    const body = await request.json();
+  protected async handlePost(
+    request: Request,
+    set: Context['set']
+  ): Promise<
+    AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
+  > {
+    const body = await parseJSONRPCRequest(request);
     const sessionId = request.headers.get('mcp-session-id');
     const acceptHeader = request.headers.get('accept') || '';
     const supportsSSE = acceptHeader.includes('text/event-stream');
@@ -90,7 +106,10 @@ export class BaseHandler {
     return transport.stream();
   }
 
-  protected async handleDelete(request: Request, set: Context['set']) {
+  protected async handleDelete(
+    request: Request,
+    set: Context['set']
+  ): Promise<JSONRPCResponseType> {
     const sessionId = request.headers.get('mcp-session-id');
 
     if (!sessionId || !transports[sessionId]) {
@@ -100,7 +119,10 @@ export class BaseHandler {
 
     const transport = transports[sessionId];
     await transport.close();
-    return { success: true, message: 'Session terminated' };
+    return createJSONRPCResponse(0, {
+      success: true,
+      message: 'Session terminated',
+    });
   }
 
   protected async handleExistingSession(
@@ -175,15 +197,16 @@ export class BaseHandler {
     set.headers['Access-Control-Allow-Origin'] = '*';
   }
 
-  protected createErrorResponse(error: unknown, id: unknown = null) {
-    return {
-      jsonrpc: '2.0',
-      error: {
-        code: -32603,
-        message: `Internal error: ${error}`,
-      },
+  protected createErrorResponse(
+    error: unknown,
+    code: ErrorCode = ErrorCode.InternalError,
+    id: number | string = 0
+  ) {
+    return createJSONRPCError(
+      error instanceof Error ? error.message : String(error),
       id,
-    };
+      code
+    );
   }
 }
 

@@ -375,8 +375,14 @@ describe('MCP Plugin', () => {
 
       expect(response.status).toBe(200);
       const body = await response.json();
-      expect(body.success).toBe(true);
-      expect(body.message).toBe('Session terminated');
+      expect(body).toEqual({
+        jsonrpc: '2.0',
+        id: 0,
+        result: {
+          success: true,
+          message: 'Session terminated',
+        },
+      });
     });
 
     it('should reject termination requests without session ID', async () => {
