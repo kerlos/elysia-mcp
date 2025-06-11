@@ -63,15 +63,33 @@ const app = new Elysia()
 
 ## Usage
 
-### Running the Example
+### Running the Examples
+
+**Basic Example:**
 
 ```bash
-# Run the example server
+# Run the basic example server (port 3000)
 bun run example
 
 # Or with development mode (auto-restart)
 bun run dev
 ```
+
+The basic example now includes comprehensive prompts functionality with advanced MCP prompt patterns:
+
+- **Git commit message generation** with conventional commits support
+- **Advanced code review** with complexity analysis integration
+- **Project documentation generation** with resource integration
+- **Interactive debugging workflows** with multi-step conversations
+- **Educational explanations** with customizable depth and format
+
+The basic example now also showcases the complete modular handler architecture:
+
+- **Separate endpoints** for tools (`/mcp/tools`), resources (`/mcp/resources`), and prompts (`/mcp/prompts`)
+- **Specialized logging** for each capability type
+- **Backward compatibility** with general `/mcp` endpoint
+- **Enhanced debugging** with handler-specific error messages
+- **Scalable architecture** for large applications
 
 ### Testing with MCP Inspector
 
@@ -96,6 +114,46 @@ bun run dev
 
 The plugin automatically handles session management via the `Mcp-Session-Id`
 header. Each session maintains its own state and can be terminated cleanly.
+
+### Modular Handler Architecture
+
+The plugin supports a modular handler architecture that allows you to create specialized endpoints for different MCP capabilities:
+
+```typescript
+import {
+  mcpPlugin,
+  ToolsHandler,
+  ResourcesHandler,
+  PromptsHandler,
+} from 'elysia-mcp';
+
+const app = new Elysia().use(
+  mcpPlugin({
+    /* config */
+  })
+);
+
+// This automatically creates the following endpoints:
+// - POST /mcp          - General endpoint (backward compatible)
+// - POST /mcp/tools    - Tools-specific endpoint
+// - POST /mcp/resources - Resources-specific endpoint
+// - POST /mcp/prompts  - Prompts-specific endpoint
+```
+
+**Benefits:**
+
+- **Separation of concerns**: Each handler focuses on specific capability
+- **Enhanced debugging**: Handler-specific logging and error messages
+- **Scalability**: Easier to maintain and extend large applications
+- **Specialized processing**: Custom validation and preprocessing per handler type
+- **Backward compatibility**: General `/mcp` endpoint remains functional
+
+**Handler Features:**
+
+- `ToolsHandler`: Enhanced tool execution logging and validation
+- `ResourcesHandler`: Resource URI tracking and caching optimization
+- `PromptsHandler`: Prompt argument validation and template debugging
+- `BaseHandler`: Core MCP protocol handling shared by all handlers
 
 ## API Reference
 
@@ -138,7 +196,7 @@ server.resource('Resource Name', 'resource://uri', async () => {
 
 ### Prompts
 
-Register prompt templates:
+Register reusable prompt templates following MCP best practices:
 
 ```typescript
 server.prompt(
@@ -158,6 +216,97 @@ server.prompt(
             text: `Generated prompt with ${args.param}`,
           },
         },
+      ],
+    };
+  }
+);
+```
+
+#### Advanced Prompt Patterns
+
+The plugin supports sophisticated prompt patterns:
+
+**Multi-step workflows:**
+
+```typescript
+server.prompt(
+  'debug-session',
+  'Interactive debugging',
+  {
+    /* args */
+  },
+  async (args) => {
+    return {
+      messages: [
+        { role: 'user', content: { type: 'text', text: 'Error description' } },
+        { role: 'assistant', content: { type: 'text', text: 'Analysis...' } },
+        { role: 'user', content: { type: 'text', text: 'Next steps...' } },
+      ],
+    };
+  }
+);
+```
+
+**Resource integration:**
+
+```typescript
+server.prompt(
+  'analyze-project',
+  'Project analysis',
+  {
+    /* args */
+  },
+  async (args) => {
+    const projectData = await getProjectStats();
+    return {
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'text', text: 'Analyze this project:' },
+        },
+        {
+          role: 'user',
+          content: {
+            type: 'resource',
+            resource: {
+              uri: 'project://stats',
+              text: JSON.stringify(projectData),
+              mimeType: 'application/json',
+            },
+          },
+        },
+      ],
+    };
+  }
+);
+```
+
+**Conditional logic:**
+
+```typescript
+server.prompt(
+  'code-review',
+  'Smart code review',
+  {
+    focus: z.enum(['security', 'performance', 'all']).optional(),
+  },
+  async (args) => {
+    const { focus = 'all' } = args;
+    let reviewPrompt = `Review this code focusing on: ${focus}`;
+
+    // Customize prompt based on focus area
+    switch (focus) {
+      case 'security':
+        reviewPrompt += '\n- Check for vulnerabilities\n- Validate inputs';
+        break;
+      case 'performance':
+        reviewPrompt += '\n- Optimize algorithms\n- Check memory usage';
+        break;
+    }
+
+    return {
+      messages: [
+        { role: 'user', content: { type: 'text', text: reviewPrompt } },
       ],
     };
   }

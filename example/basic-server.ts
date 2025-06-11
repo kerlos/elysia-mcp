@@ -1,7 +1,6 @@
 import { Elysia } from 'elysia';
-import { mcpPlugin, type McpServer } from '../src/index.js';
 import { z } from 'zod';
-import debug from 'debug';
+import { mcpPlugin, type McpServer } from '../src/index.js';
 
 // Example service class
 class ExampleService {
@@ -52,13 +51,52 @@ class ExampleService {
   }
 }
 
-// Initialize the service
+// Enhanced service for advanced prompts functionality
+class PromptDemoService {
+  async getProjectStats() {
+    return {
+      totalFiles: 15,
+      linesOfCode: 2543,
+      dependencies: 8,
+      devDependencies: 12,
+      lastModified: new Date().toISOString(),
+      languages: ['TypeScript', 'JavaScript', 'Markdown'],
+      frameworks: ['Elysia', 'Bun'],
+    };
+  }
+
+  async analyzeCodeComplexity(code: string) {
+    // Simple complexity analysis (demo purposes)
+    const lines = code.split('\n').length;
+    const functions = (code.match(/function|const.*=.*=>|\w+\s*\(/g) || [])
+      .length;
+    const branches = (code.match(/if|else|switch|case|for|while|\?/g) || [])
+      .length;
+
+    return {
+      lines,
+      functions,
+      branches,
+      complexity: Math.ceil(((functions + branches) / lines) * 100),
+      rating: branches > 10 ? 'complex' : branches > 5 ? 'moderate' : 'simple',
+    };
+  }
+}
+
+// Initialize the services
 const exampleService = new ExampleService();
+const demoService = new PromptDemoService();
+
+// Configuration
+const MCP_BASE_PATH = '/mcp'; // Configurable base path for MCP endpoints
+// Change this to customize endpoint paths, e.g., '/hello' would create:
+// /hello, /hello/tools, /hello/resources, /hello/prompts
 
 // Create the Elysia app with MCP plugin
 const app = new Elysia()
   .use(
     mcpPlugin({
+      basePath: MCP_BASE_PATH,
       serverInfo: {
         name: 'elysia-mcp-demo-server',
         version: '1.0.0',
@@ -249,7 +287,21 @@ const app = new Elysia()
           }
         );
 
-        // Register prompts directly
+        // Add project stats resource
+        server.resource('Project Statistics', 'project://stats', async () => {
+          const stats = await demoService.getProjectStats();
+          return {
+            contents: [
+              {
+                uri: 'project://stats',
+                mimeType: 'application/json',
+                text: JSON.stringify(stats, null, 2),
+              },
+            ],
+          };
+        });
+
+        // Register prompts directly - Enhanced examples following MCP best practices
         server.prompt(
           'greeting',
           'Generate a personalized greeting',
@@ -282,43 +334,80 @@ const app = new Elysia()
           }
         );
 
+        // Git commit message prompt following MCP documentation example
         server.prompt(
-          'code_review',
+          'git-commit',
+          'Generate a conventional commit message',
           {
-            language: z.string().describe('Programming language'),
-            code: z.string().describe('Code to review'),
+            changes: z
+              .string()
+              .describe(
+                'Git diff, file changes, or description of modifications'
+              ),
+            type: z
+              .enum([
+                'feat',
+                'fix',
+                'docs',
+                'style',
+                'refactor',
+                'test',
+                'chore',
+                'build',
+                'ci',
+              ])
+              .optional()
+              .describe(
+                'Conventional commit type (auto-detected if not specified)'
+              ),
+            scope: z
+              .string()
+              .optional()
+              .describe('Commit scope (component, feature area)'),
+            breaking: z
+              .string()
+              .optional()
+              .describe('Whether this is a breaking change (true/false)'),
           },
           async (args) => {
-            const { language, code } = args as {
-              language: string;
-              code: string;
-            };
-            const template = `Please review the following ${language} code:
+            const { changes, type, scope, breaking } = args;
 
-\`\`\`${language}
-${code}
-\`\`\`
+            let prompt = `Generate a conventional commit message for these changes:\n\n${changes}\n\n`;
 
-Focus on:
-- Code quality
-- Best practices
-- Potential bugs
-- Performance considerations`;
+            if (type) prompt += `Preferred type: ${type}\n`;
+            if (scope) prompt += `Scope: ${scope}\n`;
+            if (breaking) prompt += `⚠️  This is a BREAKING CHANGE\n`;
+
+            prompt += `
+Requirements:
+- Follow conventional commits format: type(scope): description
+- Use present tense ("add" not "added")
+- Keep subject line under 50 characters
+- Include body for complex changes
+- Add BREAKING CHANGE footer if needed
+- Reference issue numbers if applicable
+
+Examples:
+- feat(auth): add OAuth2 integration
+- fix(api): resolve timeout in user endpoints
+- docs: update installation instructions`;
 
             return {
-              description: 'Generate a code review prompt',
+              description: 'Generate conventional commit message',
               messages: [
                 {
-                  role: 'user',
+                  role: 'user' as const,
                   content: {
-                    type: 'text',
-                    text: template,
+                    type: 'text' as const,
+                    text: prompt,
                   },
                 },
               ],
             };
           }
         );
+
+        console.log('✅ Enhanced prompts and tools registered successfully!');
       },
     })
   )
@@ -333,6 +422,32 @@ Focus on:
       reusePort: true,
     },
     () => {
-      console.log('🦊 Elysia MCP Server is running at port 3000');
+      console.log('🦊 Simplified Elysia MCP Server running on port 3000');
+      console.log('');
+      console.log('📋 MCP Protocol Endpoints:');
+      console.log(`  🔄 Core MCP:  POST ${MCP_BASE_PATH}`);
+      console.log(`  🔧 Tools:     POST ${MCP_BASE_PATH}/tools`);
+      console.log(`  📂 Resources: POST ${MCP_BASE_PATH}/resources`);
+      console.log(`  💬 Prompts:   POST ${MCP_BASE_PATH}/prompts`);
+      console.log('');
+      console.log('📊 Feature Summary:');
+      console.log('  • 6 Tools: calculate, add, get_time, echo, validate_user');
+      console.log(
+        '  • 3 Resources: System Information, Package Configuration, Project Statistics'
+      );
+      console.log('  • 2 Prompts: greeting, git-commit');
+      console.log('');
+      console.log('🌐 Additional Endpoints:');
+      console.log('  • GET /health - Server status and modular endpoint info');
+      console.log('');
+      console.log('✨ Key Features:');
+      console.log(
+        '  • Modular handler architecture with specialized endpoints'
+      );
+      console.log(
+        '  • Simple greeting prompt demonstrating basic functionality'
+      );
+      console.log('  • Practical git-commit prompt with enhanced parameters');
+      console.log('  • Resource integration for enhanced context');
     }
   );

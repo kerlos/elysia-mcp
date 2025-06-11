@@ -3,7 +3,6 @@ import {
   JSONRPCMessageSchema,
   type JSONRPCMessage,
 } from '@modelcontextprotocol/sdk/types.js';
-import { debug } from 'debug';
 
 export class ElysiaStreamingHttpTransport implements Transport {
   private _sessionId: string;

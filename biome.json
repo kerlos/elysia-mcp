@@ -20,6 +20,10 @@
       "recommended": true,
       "complexity": {
         "useLiteralKeys": "off"
+      },
+      "style": {
+        "noUnusedTemplateLiteral": "off",
+        "useTemplate": "off"
       }
     }
   },
