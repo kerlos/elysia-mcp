@@ -3,8 +3,11 @@ import {
   type JSONRPCResponse,
   type JSONRPCError,
   type JSONRPCMessage,
+  type InitializeRequest,
   JSONRPCRequestSchema,
+  InitializeRequestSchema,
   ErrorCode,
+  JSONRPCMessageSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
 /**
@@ -24,6 +27,9 @@ export async function parseJSONRPCRequest(
   request: Request
 ): Promise<JSONRPCRequest> {
   if (request.method !== 'POST') {
+    console.log(
+      'Method not allowed. Only POST requests are supported for MCP endpoints.'
+    );
     throw new Error(
       'Method not allowed. Only POST requests are supported for MCP endpoints.'
     );
@@ -32,11 +38,13 @@ export async function parseJSONRPCRequest(
   try {
     const rawBody = await request.json();
 
-    // Validate against JSON-RPC request schema
-    const jsonrpcRequest = JSONRPCRequestSchema.parse(rawBody);
+    // Validate against JSON-RPC request schema for other requests
+    //const jsonrpcRequest = JSONRPCMessageSchema.parse(rawBody);
 
-    return jsonrpcRequest as JSONRPCRequest;
+    //FIXME: This is a temporary fix to allow the server to work with the all request
+    return rawBody;
   } catch (error) {
+    console.log('error', error);
     throw new Error(
       `Invalid JSON-RPC request format: ${
         error instanceof Error ? error.message : String(error)
