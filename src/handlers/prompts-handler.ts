@@ -1,10 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Context } from 'elysia';
-import { BaseHandler } from './base-handler.js';
+import { BaseHandler } from './base-handler';
 import {
   type JSONRPCResponseType,
   parseJSONRPCRequest,
-} from '../utils/jsonrpc.js';
+} from '../utils/jsonrpc';
 import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 /**
@@ -24,9 +24,7 @@ export class PromptsHandler extends BaseHandler {
     set: Context['set'];
   }) {
     // Log prompts-specific requests if logging is enabled
-    if (this.enableLogging) {
-      console.log(`💬 Prompts Handler: ${request.method} ${request.url}`);
-    }
+    this.logger.log(`💬 Prompts Handler: ${request.method} ${request.url}`);
 
     // For prompts endpoints, we might want to add specific validation
     // or preprocessing before handling the request
@@ -40,17 +38,17 @@ export class PromptsHandler extends BaseHandler {
     AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
   > {
     try {
-      const body = await parseJSONRPCRequest(request);
+      const body = await parseJSONRPCRequest(request, this.logger);
 
       // Add prompts-specific validation or preprocessing if needed
-      if (this.enableLogging && body?.method) {
-        console.log(`💬 Prompts method: ${body.method}`);
+      if (body?.method) {
+        this.logger.log(`💬 Prompts method: ${body.method}`);
 
         // Log prompt names and arguments for debugging
         if (body.method === 'prompts/get' && body.params?.name) {
-          console.log(`💬 Getting prompt: ${body.params.name}`);
+          this.logger.log(`💬 Getting prompt: ${body.params.name}`);
           if (body.params.arguments) {
-            console.log(
+            this.logger.log(
               `💬 With arguments:`,
               Object.keys(body.params.arguments)
             );
@@ -58,7 +56,7 @@ export class PromptsHandler extends BaseHandler {
         }
 
         if (body.method === 'prompts/list') {
-          console.log(`💬 Listing available prompts`);
+          this.logger.log(`💬 Listing available prompts`);
         }
       }
 
@@ -78,12 +76,10 @@ export class PromptsHandler extends BaseHandler {
     const url = new URL(request.url);
     const promptName = url.searchParams.get('name');
 
-    if (this.enableLogging) {
-      if (promptName) {
-        console.log(`💬 Direct prompt access: ${promptName}`);
-      } else {
-        console.log(`💬 Direct prompts listing`);
-      }
+    if (promptName) {
+      this.logger.log(`💬 Direct prompt access: ${promptName}`);
+    } else {
+      this.logger.log(`💬 Direct prompts listing`);
     }
 
     return await super.handleGet(request, set);

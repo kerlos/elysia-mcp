@@ -3,37 +3,40 @@ import {
   JSONRPCMessageSchema,
   type JSONRPCMessage,
 } from '@modelcontextprotocol/sdk/types.js';
+import { Logger } from './utils/logger';
 
 export class ElysiaStreamingHttpTransport implements Transport {
   private _sessionId: string;
   private _isConnected = false;
   private _messageQueue: string[] = [];
+  private logger: Logger;
 
   onclose?: () => void;
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
 
-  constructor(private _endpoint: string) {
+  constructor(private _endpoint: string, enableLogging = false) {
     this._sessionId = Bun.randomUUIDv7();
+    this.logger = new Logger(enableLogging);
   }
 
   async start(): Promise<void> {
-    console.log(`[Transport:${this._sessionId}] Starting transport`);
+    this.logger.log(`[Transport:${this._sessionId}] Starting transport`);
 
     // If already started, don't do anything
     if (this._isConnected) {
-      console.log(`[Transport:${this._sessionId}] Already started`);
+      this.logger.log(`[Transport:${this._sessionId}] Already started`);
       return;
     }
 
     try {
       // Mark as connected
       this._isConnected = true;
-      console.log(`[Transport:${this._sessionId}] Transport connected`);
+      this.logger.log(`[Transport:${this._sessionId}] Transport connected`);
 
-      console.log(`[Transport:${this._sessionId}] Endpoint event sent`);
+      this.logger.log(`[Transport:${this._sessionId}] Endpoint event sent`);
     } catch (error) {
-      console.error(
+      this.logger.error(
         `[Transport:${this._sessionId}] Error starting transport:`,
         error
       );
@@ -45,7 +48,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
   private _sendEvent(event: string, data: string): void {
     if (!this._isConnected) {
-      console.error(
+      this.logger.error(
         `[Transport:${this._sessionId}] Cannot send event, not connected`
       );
       return;
@@ -55,7 +58,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
       // Queue the event for streaming
       this._messageQueue.push(`event: ${event}\ndata: ${data}\n\n`);
     } catch (error) {
-      console.error(
+      this.logger.error(
         `[Transport:${this._sessionId}] Error sending event:`,
         error
       );
@@ -86,10 +89,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
   async handlePostMessage(
     body: unknown
   ): Promise<{ success: boolean; error?: string }> {
-    console.log(`[Transport:${this._sessionId}] Received message`);
+    this.logger.log(`[Transport:${this._sessionId}] Received message`);
 
     if (!this._isConnected) {
-      console.error(`[Transport:${this._sessionId}] Not connected`);
+      this.logger.error(`[Transport:${this._sessionId}] Not connected`);
       return { success: false, error: 'SSE connection not established' };
     }
 
@@ -100,7 +103,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
       // Return success
       return { success: true };
     } catch (error) {
-      console.error(
+      this.logger.error(
         `[Transport:${this._sessionId}] Error handling message:`,
         error
       );
@@ -109,13 +112,13 @@ export class ElysiaStreamingHttpTransport implements Transport {
   }
 
   async handleMessage(message: unknown): Promise<void> {
-    console.log(`[Transport:${this._sessionId}] Parsing message`);
+    this.logger.log(`[Transport:${this._sessionId}] Parsing message`);
 
     let parsedMessage: JSONRPCMessage;
     try {
       parsedMessage = JSONRPCMessageSchema.parse(message);
     } catch (error) {
-      console.error(
+      this.logger.error(
         `[Transport:${this._sessionId}] Invalid message format:`,
         error
       );
@@ -123,31 +126,33 @@ export class ElysiaStreamingHttpTransport implements Transport {
       throw error;
     }
 
-    console.log(`[Transport:${this._sessionId}] Forwarding message to handler`);
+    this.logger.log(
+      `[Transport:${this._sessionId}] Forwarding message to handler`
+    );
     this.onmessage?.(parsedMessage);
   }
 
   async close(): Promise<void> {
-    console.log(`[Transport:${this._sessionId}] Closing transport`);
+    this.logger.log(`[Transport:${this._sessionId}] Closing transport`);
 
     this._isConnected = false;
     this.onclose?.();
   }
 
   async send(message: JSONRPCMessage): Promise<void> {
-    console.log(
+    this.logger.log(
       `[Transport:${this._sessionId}] Sending message: ${JSON.stringify(
         message
       )}`
     );
 
     if (!this._isConnected) {
-      console.error(`[Transport:${this._sessionId}] Not connected`);
+      this.logger.error(`[Transport:${this._sessionId}] Not connected`);
       throw new Error('Not connected');
     }
 
     this._sendEvent('message', JSON.stringify(message));
-    console.log(
+    this.logger.log(
       `[Transport:${this._sessionId}] Message queued, queue length: ${this._messageQueue.length}`
     );
   }

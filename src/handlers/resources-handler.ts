@@ -1,10 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Context } from 'elysia';
-import { BaseHandler } from './base-handler.js';
+import { BaseHandler } from './base-handler';
 import {
   type JSONRPCResponseType,
   parseJSONRPCRequest,
-} from '../utils/jsonrpc.js';
+} from '../utils/jsonrpc';
 import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 /**
@@ -24,9 +24,7 @@ export class ResourcesHandler extends BaseHandler {
     set: Context['set'];
   }) {
     // Log resources-specific requests if logging is enabled
-    if (this.enableLogging) {
-      console.log(`📂 Resources Handler: ${request.method} ${request.url}`);
-    }
+    this.logger.log(`📂 Resources Handler: ${request.method} ${request.url}`);
 
     // For resources endpoints, we might want to add specific validation
     // or preprocessing before handling the request
@@ -40,15 +38,15 @@ export class ResourcesHandler extends BaseHandler {
     AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
   > {
     try {
-      const body = await parseJSONRPCRequest(request);
+      const body = await parseJSONRPCRequest(request, this.logger);
 
       // Add resources-specific validation or preprocessing if needed
-      if (this.enableLogging && body?.method) {
-        console.log(`📂 Resources method: ${body.method}`);
+      if (body?.method) {
+        this.logger.log(`📂 Resources method: ${body.method}`);
 
         // Log resource URIs for debugging
         if (body.method === 'resources/read' && body.params?.uri) {
-          console.log(`📂 Reading resource: ${body.params.uri}`);
+          this.logger.log(`📂 Reading resource: ${body.params.uri}`);
         }
       }
 
@@ -68,8 +66,8 @@ export class ResourcesHandler extends BaseHandler {
     const url = new URL(request.url);
     const resourcePath = url.searchParams.get('uri');
 
-    if (this.enableLogging && resourcePath) {
-      console.log(`📂 Direct resource access: ${resourcePath}`);
+    if (resourcePath) {
+      this.logger.log(`📂 Direct resource access: ${resourcePath}`);
     }
 
     return await super.handleGet(request, set);

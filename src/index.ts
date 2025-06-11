@@ -1,7 +1,7 @@
 // Main exports for elysia-mcp
-export { mcp } from './mcp-plugin.js';
-export { ElysiaStreamingHttpTransport as SSEElysiaTransport } from './transport.js';
-export type { MCPPluginOptions } from './mcp-plugin.js';
+export { mcp } from './mcp-plugin';
+export { ElysiaStreamingHttpTransport as SSEElysiaTransport } from './transport';
+export type { MCPPluginOptions } from './mcp-plugin';
 
 // Export handlers for advanced usage
 export {
@@ -10,8 +10,8 @@ export {
   ResourcesHandler,
   PromptsHandler,
   getHandlerType,
-} from './handlers/index.js';
-export type { HandlerContext } from './handlers/index.js';
+} from './handlers/index';
+export type { HandlerContext } from './handlers/index';
 
 // Export content types and utilities
 export type {
@@ -21,13 +21,13 @@ export type {
   ResourceContent,
   PromptContent,
   PromptMessage,
-} from './types.js';
+} from './types';
 export {
   createTextContent,
   createImageContent,
   createAudioContent,
   createResourceContent,
-} from './types.js';
+} from './types';
 
 // Re-export useful types from MCP SDK
 export type {

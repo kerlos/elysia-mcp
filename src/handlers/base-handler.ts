@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Context } from 'elysia';
-import { ElysiaStreamingHttpTransport } from '../transport.js';
+import { ElysiaStreamingHttpTransport } from '../transport';
 import {
   ErrorCode,
   isInitializeRequest,
@@ -10,7 +10,8 @@ import {
   createJSONRPCResponse,
   type JSONRPCResponseType,
   parseJSONRPCRequest,
-} from '../utils/jsonrpc.js';
+} from '../utils/jsonrpc';
+import { Logger } from '../utils/logger';
 
 // Session management
 export const transports: { [sessionId: string]: ElysiaStreamingHttpTransport } =
@@ -27,11 +28,15 @@ export interface HandlerContext {
 
 // Common handler functionality
 export class BaseHandler {
+  protected logger: Logger;
+
   constructor(
     protected server: McpServer,
     protected enableLogging = false,
     protected basePath = '/mcp'
-  ) {}
+  ) {
+    this.logger = new Logger(enableLogging);
+  }
 
   async handleRequest({
     request,
@@ -68,7 +73,7 @@ export class BaseHandler {
   ): Promise<
     AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
   > {
-    const body = await parseJSONRPCRequest(request);
+    const body = await parseJSONRPCRequest(request, this.logger);
     const sessionId = request.headers.get('mcp-session-id');
     const acceptHeader = request.headers.get('accept') || '';
     const supportsSSE = acceptHeader.includes('text/event-stream');
@@ -150,7 +155,10 @@ export class BaseHandler {
     set: Context['set']
   ) {
     // Create new transport
-    const transport = new ElysiaStreamingHttpTransport(this.basePath);
+    const transport = new ElysiaStreamingHttpTransport(
+      this.basePath,
+      this.enableLogging
+    );
     const newSessionId = transport.sessionId;
 
     // Store transport by session ID
@@ -159,9 +167,7 @@ export class BaseHandler {
     // Set up transport event handlers
     transport.onclose = () => {
       delete transports[newSessionId];
-      if (this.enableLogging) {
-        console.log(`MCP session terminated: ${newSessionId}`);
-      }
+      this.logger.log(`MCP session terminated: ${newSessionId}`);
     };
 
     // Start the transport
@@ -170,9 +176,7 @@ export class BaseHandler {
     // Connect the server to the new transport
     await this.server.connect(transport);
 
-    if (this.enableLogging) {
-      console.log(`MCP session initialized: ${newSessionId}`);
-    }
+    this.logger.log(`MCP session initialized: ${newSessionId}`);
 
     // Handle the initialization message through the transport
     await transport.handleMessage(body);

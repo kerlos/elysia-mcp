@@ -7,7 +7,8 @@ import {
   ResourcesHandler,
   PromptsHandler,
   getHandlerType,
-} from './handlers/index.js';
+} from './handlers/index';
+import { Logger } from './utils/logger';
 
 // Plugin options
 export interface MCPPluginOptions {
@@ -51,6 +52,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
 
   const basePath = options.basePath || '/mcp';
   const handlers = createHandlers(basePath, options.enableLogging || false);
+  const logger = new Logger(options.enableLogging || false);
 
   return new Elysia({ name: `mcp-${serverInfo.name}` })
     .all(basePath, async ({ request, set }) => {
@@ -67,9 +69,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
       // Ensure server setup is complete before proceeding
       await setupPromise;
 
-      if (options.enableLogging) {
-        console.log(`🔧 Tools endpoint: ${request.method} ${request.url}`);
-      }
+      logger.log(`🔧 Tools endpoint: ${request.method} ${request.url}`);
 
       return await handlers.tools.handleRequest({ request, set });
     })
@@ -77,9 +77,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
       // Ensure server setup is complete before proceeding
       await setupPromise;
 
-      if (options.enableLogging) {
-        console.log(`📂 Resources endpoint: ${request.method} ${request.url}`);
-      }
+      logger.log(`📂 Resources endpoint: ${request.method} ${request.url}`);
 
       return await handlers.resources.handleRequest({ request, set });
     })
@@ -87,9 +85,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
       // Ensure server setup is complete before proceeding
       await setupPromise;
 
-      if (options.enableLogging) {
-        console.log(`💬 Prompts endpoint: ${request.method} ${request.url}`);
-      }
+      logger.log(`💬 Prompts endpoint: ${request.method} ${request.url}`);
 
       return await handlers.prompts.handleRequest({ request, set });
     });

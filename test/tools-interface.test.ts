@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll } from 'bun:test';
 import { Elysia } from 'elysia';
-import { mcp } from '../src/mcp-plugin.js';
+import { mcp } from '../src/mcp-plugin';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 

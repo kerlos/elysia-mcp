@@ -1,10 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Context } from 'elysia';
-import { BaseHandler } from './base-handler.js';
+import { BaseHandler } from './base-handler';
 import {
   type JSONRPCResponseType,
   parseJSONRPCRequest,
-} from '../utils/jsonrpc.js';
+} from '../utils/jsonrpc';
 import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 /**
@@ -26,9 +26,7 @@ export class ToolsHandler extends BaseHandler {
     AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
   > {
     // Log tools-specific requests if logging is enabled
-    if (this.enableLogging) {
-      console.log(`🔧 Tools Handler: ${request.method} ${request.url}`);
-    }
+    this.logger.log(`🔧 Tools Handler: ${request.method} ${request.url}`);
 
     // For tools endpoints, we might want to add specific validation
     // or preprocessing before handling the request
@@ -42,11 +40,11 @@ export class ToolsHandler extends BaseHandler {
     AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
   > {
     try {
-      const body = await parseJSONRPCRequest(request);
+      const body = await parseJSONRPCRequest(request, this.logger);
 
       // Add tools-specific validation or preprocessing if needed
-      if (this.enableLogging && body?.method) {
-        console.log(`🔧 Tools method: ${body.method}`);
+      if (body?.method) {
+        this.logger.log(`🔧 Tools method: ${body.method}`);
       }
 
       return await super.handlePost(request, set);
