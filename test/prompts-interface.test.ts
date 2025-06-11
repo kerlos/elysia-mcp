@@ -3,6 +3,13 @@ import { Elysia } from 'elysia';
 import { mcp } from '../src/mcp-plugin.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import {
+  type PromptMessage,
+  createTextContent,
+  createImageContent,
+  createAudioContent,
+  createResourceContent,
+} from '../src/index.js';
 
 describe('MCP Prompts Interface Testing', () => {
   let app: Elysia;
@@ -45,10 +52,7 @@ describe('MCP Prompts Interface Testing', () => {
                 messages: [
                   {
                     role: 'user',
-                    content: {
-                      type: 'text',
-                      text: result,
-                    },
+                    content: createTextContent(result),
                   },
                 ],
               };
@@ -89,10 +93,7 @@ Requirements:
                 messages: [
                   {
                     role: 'user' as const,
-                    content: {
-                      type: 'text' as const,
-                      text: prompt,
-                    },
+                    content: createTextContent(prompt),
                   },
                 ],
               };
@@ -138,12 +139,234 @@ Requirements:
                 messages: [
                   {
                     role: 'user' as const,
-                    content: {
-                      type: 'text' as const,
-                      text: prompt,
-                    },
+                    content: createTextContent(prompt),
                   },
                 ],
+              };
+            }
+          );
+
+          // Test prompt for image content
+          server.prompt(
+            'test_image_content',
+            'Test prompt with image content',
+            {
+              includeImage: z
+                .string()
+                .optional()
+                .describe('Include sample image (true/false)'),
+              description: z
+                .string()
+                .optional()
+                .describe('Description for the image'),
+            },
+            async (args) => {
+              const messages: PromptMessage[] = [
+                {
+                  role: 'user',
+                  content: createTextContent(
+                    args.description || 'Here is a sample image for testing:'
+                  ),
+                },
+              ];
+
+              if (args.includeImage === 'true') {
+                // Sample 1x1 PNG pixel in base64 (transparent)
+                const sampleImageData =
+                  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+                messages.push({
+                  role: 'assistant',
+                  content: createImageContent(sampleImageData, 'image/png'),
+                });
+              }
+
+              return {
+                description: 'Test prompt with image content',
+                messages,
+              };
+            }
+          );
+
+          // Test prompt for audio content
+          server.prompt(
+            'test_audio_content',
+            'Test prompt with audio content',
+            {
+              includeAudio: z
+                .string()
+                .optional()
+                .describe('Include sample audio (true/false)'),
+              description: z
+                .string()
+                .optional()
+                .describe('Description for the audio'),
+            },
+            async (args) => {
+              const messages: PromptMessage[] = [
+                {
+                  role: 'user',
+                  content: createTextContent(
+                    args.description || 'Here is a sample audio for testing:'
+                  ),
+                },
+              ];
+
+              if (args.includeAudio === 'true') {
+                // Sample minimal WAV header (silence) in base64
+                const sampleAudioData =
+                  'UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+                messages.push({
+                  role: 'assistant',
+                  content: createAudioContent(sampleAudioData, 'audio/wav'),
+                });
+              }
+
+              return {
+                description: 'Test prompt with audio content',
+                messages,
+              };
+            }
+          );
+
+          // Test prompt for resource content
+          server.prompt(
+            'test_resource_content',
+            'Test prompt with embedded resource content',
+            {
+              includeResource: z
+                .string()
+                .optional()
+                .describe('Include sample resource (true/false)'),
+              resourceType: z
+                .enum(['json', 'text', 'config'])
+                .optional()
+                .describe('Type of resource to include'),
+            },
+            async (args) => {
+              const messages: PromptMessage[] = [
+                {
+                  role: 'user',
+                  content: createTextContent(
+                    'Here is the requested resource data:'
+                  ),
+                },
+              ];
+
+              if (args.includeResource === 'true') {
+                let resourceData: string;
+                let mimeType: string;
+                let uri: string;
+
+                switch (args.resourceType) {
+                  case 'json':
+                    resourceData = JSON.stringify({
+                      test: true,
+                      timestamp: new Date().toISOString(),
+                      data: ['item1', 'item2', 'item3'],
+                    });
+                    mimeType = 'application/json';
+                    uri = 'test://json-data';
+                    break;
+                  case 'config':
+                    resourceData = `# Test Configuration
+debug=true
+environment=test
+version=1.0.0
+features=["feature1", "feature2"]`;
+                    mimeType = 'text/plain';
+                    uri = 'test://config-data';
+                    break;
+                  default:
+                    resourceData =
+                      'This is a sample text resource for testing purposes.';
+                    mimeType = 'text/plain';
+                    uri = 'test://text-data';
+                }
+
+                messages.push({
+                  role: 'assistant',
+                  content: createResourceContent(uri, resourceData, mimeType),
+                });
+              }
+
+              return {
+                description: 'Test prompt with embedded resource content',
+                messages,
+              };
+            }
+          );
+
+          // Test prompt for mixed content types
+          server.prompt(
+            'test_mixed_content',
+            'Test prompt with multiple content types',
+            {
+              includeText: z
+                .string()
+                .optional()
+                .describe('Include text content (true/false)'),
+              includeImage: z
+                .string()
+                .optional()
+                .describe('Include image content (true/false)'),
+              includeAudio: z
+                .string()
+                .optional()
+                .describe('Include audio content (true/false)'),
+              includeResource: z
+                .string()
+                .optional()
+                .describe('Include resource content (true/false)'),
+            },
+            async (args) => {
+              const messages: PromptMessage[] = [];
+
+              if (args.includeText === 'true') {
+                messages.push({
+                  role: 'user',
+                  content: createTextContent(
+                    'This is a comprehensive test of all MCP PromptMessage content types.'
+                  ),
+                });
+              }
+
+              if (args.includeImage === 'true') {
+                const sampleImageData =
+                  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+                messages.push({
+                  role: 'assistant',
+                  content: createImageContent(sampleImageData, 'image/png'),
+                });
+              }
+
+              if (args.includeAudio === 'true') {
+                const sampleAudioData =
+                  'UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+                messages.push({
+                  role: 'assistant',
+                  content: createAudioContent(sampleAudioData, 'audio/wav'),
+                });
+              }
+
+              if (args.includeResource === 'true') {
+                const testData = {
+                  mixedContentTest: true,
+                  contentTypes: ['text', 'image', 'audio', 'resource'],
+                  timestamp: new Date().toISOString(),
+                };
+                messages.push({
+                  role: 'assistant',
+                  content: createResourceContent(
+                    'test://mixed-content',
+                    JSON.stringify(testData, null, 2),
+                    'application/json'
+                  ),
+                });
+              }
+
+              return {
+                description: 'Test prompt with multiple content types',
+                messages,
               };
             }
           );
@@ -697,6 +920,439 @@ Requirements:
       );
 
       expect(response.status).toBe(202); // Request accepted, validation error in response
+    });
+  });
+
+  describe('Content Type Testing', () => {
+    describe('Text Content', () => {
+      it('should handle prompts with text content', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_greeting',
+                arguments: { name: 'TextTestUser' },
+              },
+              jsonrpc: '2.0',
+              id: 100,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+    });
+
+    describe('Image Content', () => {
+      it('should handle prompts with image content', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_image_content',
+                arguments: {
+                  includeImage: 'true',
+                  description: 'Testing image content functionality',
+                },
+              },
+              jsonrpc: '2.0',
+              id: 101,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+
+      it('should handle prompts without image content', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_image_content',
+                arguments: {
+                  includeImage: 'false',
+                  description: 'Testing without image content',
+                },
+              },
+              jsonrpc: '2.0',
+              id: 102,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+    });
+
+    describe('Audio Content', () => {
+      it('should handle prompts with audio content', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_audio_content',
+                arguments: {
+                  includeAudio: 'true',
+                  description: 'Testing audio content functionality',
+                },
+              },
+              jsonrpc: '2.0',
+              id: 103,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+
+      it('should handle prompts without audio content', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_audio_content',
+                arguments: {
+                  includeAudio: 'false',
+                  description: 'Testing without audio content',
+                },
+              },
+              jsonrpc: '2.0',
+              id: 104,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+    });
+
+    describe('Resource Content', () => {
+      it('should handle prompts with JSON resource content', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_resource_content',
+                arguments: {
+                  includeResource: 'true',
+                  resourceType: 'json',
+                },
+              },
+              jsonrpc: '2.0',
+              id: 105,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+
+      it('should handle prompts with text resource content', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_resource_content',
+                arguments: {
+                  includeResource: 'true',
+                  resourceType: 'text',
+                },
+              },
+              jsonrpc: '2.0',
+              id: 106,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+
+      it('should handle prompts with config resource content', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_resource_content',
+                arguments: {
+                  includeResource: 'true',
+                  resourceType: 'config',
+                },
+              },
+              jsonrpc: '2.0',
+              id: 107,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+
+      it('should handle prompts without resource content', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_resource_content',
+                arguments: {
+                  includeResource: 'false',
+                },
+              },
+              jsonrpc: '2.0',
+              id: 108,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+    });
+
+    describe('Mixed Content Types', () => {
+      it('should handle prompts with all content types', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_mixed_content',
+                arguments: {
+                  includeText: 'true',
+                  includeImage: 'true',
+                  includeAudio: 'true',
+                  includeResource: 'true',
+                },
+              },
+              jsonrpc: '2.0',
+              id: 109,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+
+      it('should handle prompts with selective content types', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_mixed_content',
+                arguments: {
+                  includeText: 'true',
+                  includeImage: 'false',
+                  includeAudio: 'true',
+                  includeResource: 'false',
+                },
+              },
+              jsonrpc: '2.0',
+              id: 110,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+
+      it('should handle prompts with no optional content', async () => {
+        const response = await app.handle(
+          new Request('http://localhost:3000/mcp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Mcp-Session-Id': sessionId,
+            },
+            body: JSON.stringify({
+              method: 'prompts/get',
+              params: {
+                name: 'test_mixed_content',
+                arguments: {
+                  includeText: 'false',
+                  includeImage: 'false',
+                  includeAudio: 'false',
+                  includeResource: 'false',
+                },
+              },
+              jsonrpc: '2.0',
+              id: 111,
+            }),
+          })
+        );
+
+        expect(response.status).toBe(202);
+      });
+    });
+  });
+
+  describe('Content Type Validation', () => {
+    it('should handle invalid enum values for resource type', async () => {
+      const response = await app.handle(
+        new Request('http://localhost:3000/mcp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Mcp-Session-Id': sessionId,
+          },
+          body: JSON.stringify({
+            method: 'prompts/get',
+            params: {
+              name: 'test_resource_content',
+              arguments: {
+                includeResource: 'true',
+                resourceType: 'invalid_type', // Invalid enum value
+              },
+            },
+            jsonrpc: '2.0',
+            id: 120,
+          }),
+        })
+      );
+
+      expect(response.status).toBe(202); // Request accepted, validation error in response
+    });
+
+    it('should handle missing optional parameters gracefully', async () => {
+      const response = await app.handle(
+        new Request('http://localhost:3000/mcp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Mcp-Session-Id': sessionId,
+          },
+          body: JSON.stringify({
+            method: 'prompts/get',
+            params: {
+              name: 'test_mixed_content',
+              arguments: {
+                // All parameters are optional
+              },
+            },
+            jsonrpc: '2.0',
+            id: 121,
+          }),
+        })
+      );
+
+      expect(response.status).toBe(202);
+    });
+  });
+
+  describe('PromptMessage Structure Validation', () => {
+    it('should handle prompts that return proper PromptMessage structure', async () => {
+      const response = await app.handle(
+        new Request('http://localhost:3000/mcp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Mcp-Session-Id': sessionId,
+          },
+          body: JSON.stringify({
+            method: 'prompts/get',
+            params: {
+              name: 'test_image_content',
+              arguments: {
+                includeImage: 'true',
+                description: 'Testing PromptMessage structure',
+              },
+            },
+            jsonrpc: '2.0',
+            id: 130,
+          }),
+        })
+      );
+
+      expect(response.status).toBe(202);
+    });
+
+    it('should handle prompts with multiple message roles', async () => {
+      const response = await app.handle(
+        new Request('http://localhost:3000/mcp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Mcp-Session-Id': sessionId,
+          },
+          body: JSON.stringify({
+            method: 'prompts/get',
+            params: {
+              name: 'test_mixed_content',
+              arguments: {
+                includeText: 'true',
+                includeResource: 'true',
+              },
+            },
+            jsonrpc: '2.0',
+            id: 131,
+          }),
+        })
+      );
+
+      expect(response.status).toBe(202);
     });
   });
 });

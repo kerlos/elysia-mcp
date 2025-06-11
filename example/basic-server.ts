@@ -1,6 +1,14 @@
 import { Elysia } from 'elysia';
 import { z } from 'zod';
-import { mcp, type McpServer } from '../src/index.js';
+import {
+  mcp,
+  type McpServer,
+  type PromptMessage,
+  createImageContent,
+  createAudioContent,
+  createResourceContent,
+  createTextContent,
+} from '../src/index.js';
 
 // Example service class
 class ExampleService {
@@ -304,13 +312,19 @@ const app = new Elysia()
         // Register prompts directly - Enhanced examples following MCP best practices
         server.prompt(
           'greeting',
-          'Generate a personalized greeting',
+          'Generate a personalized greeting with multimedia content',
           {
             name: z.string().describe('Name of the person to greet'),
             time: z
               .string()
               .optional()
               .describe('Time of day (morning, afternoon, evening)'),
+            includeSystemInfo: z
+              .string()
+              .optional()
+              .describe(
+                'Include system information as embedded resource (true/false)'
+              ),
           },
           async (args) => {
             const result = await exampleService.generateGreeting(
@@ -319,17 +333,108 @@ const app = new Elysia()
                 time?: string;
               }
             );
+
+            const messages: PromptMessage[] = [
+              {
+                role: 'user',
+                content: createTextContent(result),
+              },
+            ];
+
+            // Add embedded resource if requested
+            if (args.includeSystemInfo === 'true') {
+              const systemInfo = await exampleService.getSystemInfo();
+              messages.push({
+                role: 'assistant',
+                content: createResourceContent(
+                  'example://system-info',
+                  JSON.stringify(systemInfo, null, 2),
+                  'application/json'
+                ),
+              });
+            }
+
             return {
-              description: 'Generate a personalized greeting',
-              messages: [
-                {
-                  role: 'user',
-                  content: {
-                    type: 'text',
-                    text: result,
-                  },
-                },
-              ],
+              description:
+                'Generate a personalized greeting with optional system info',
+              messages,
+            };
+          }
+        );
+
+        // Comprehensive prompt demonstrating all PromptMessage content types
+        server.prompt(
+          'multimedia-demo',
+          'Demonstrate all PromptMessage content types: text, image, audio, and embedded resources',
+          {
+            includeImage: z
+              .string()
+              .optional()
+              .describe('Include sample image content (true/false)'),
+            includeAudio: z
+              .string()
+              .optional()
+              .describe('Include sample audio content (true/false)'),
+            includeResource: z
+              .string()
+              .optional()
+              .describe('Include embedded resource (true/false)'),
+            customText: z
+              .string()
+              .optional()
+              .describe('Custom text content to include'),
+          },
+          async (args) => {
+            const messages: PromptMessage[] = [];
+
+            // Always include text content
+            const textContent =
+              args.customText ||
+              'This is a demonstration of MCP PromptMessage content types.';
+            messages.push({
+              role: 'user',
+              content: createTextContent(textContent),
+            });
+
+            // Include image content if requested
+            if (args.includeImage === 'true') {
+              // Sample 1x1 PNG pixel in base64 (transparent)
+              const sampleImageData =
+                'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+              messages.push({
+                role: 'assistant',
+                content: createImageContent(sampleImageData, 'image/png'),
+              });
+            }
+
+            // Include audio content if requested
+            if (args.includeAudio === 'true') {
+              // Sample minimal WAV header (silence) in base64
+              const sampleAudioData =
+                'UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+              messages.push({
+                role: 'assistant',
+                content: createAudioContent(sampleAudioData, 'audio/wav'),
+              });
+            }
+
+            // Include embedded resource if requested
+            if (args.includeResource === 'true') {
+              const projectStats = await demoService.getProjectStats();
+              messages.push({
+                role: 'assistant',
+                content: createResourceContent(
+                  'project://stats',
+                  JSON.stringify(projectStats, null, 2),
+                  'application/json'
+                ),
+              });
+            }
+
+            return {
+              description:
+                'Multimedia demonstration showing all PromptMessage content types',
+              messages,
             };
           }
         );
@@ -337,7 +442,7 @@ const app = new Elysia()
         // Git commit message prompt following MCP documentation example
         server.prompt(
           'git-commit',
-          'Generate a conventional commit message',
+          'Generate a conventional commit message with optional code analysis',
           {
             changes: z
               .string()
@@ -368,15 +473,22 @@ const app = new Elysia()
               .string()
               .optional()
               .describe('Whether this is a breaking change (true/false)'),
+            includeAnalysis: z
+              .string()
+              .optional()
+              .describe(
+                'Include code complexity analysis as embedded resource (true/false)'
+              ),
           },
           async (args) => {
-            const { changes, type, scope, breaking } = args;
+            const { changes, type, scope, breaking, includeAnalysis } = args;
 
             let prompt = `Generate a conventional commit message for these changes:\n\n${changes}\n\n`;
 
             if (type) prompt += `Preferred type: ${type}\n`;
             if (scope) prompt += `Scope: ${scope}\n`;
-            if (breaking) prompt += `⚠️  This is a BREAKING CHANGE\n`;
+            if (breaking === 'true')
+              prompt += `⚠️  This is a BREAKING CHANGE\n`;
 
             prompt += `
 Requirements:
@@ -392,22 +504,43 @@ Examples:
 - fix(api): resolve timeout in user endpoints
 - docs: update installation instructions`;
 
+            const messages: PromptMessage[] = [
+              {
+                role: 'user',
+                content: createTextContent(prompt),
+              },
+            ];
+
+            // Include code analysis as embedded resource if requested
+            if (includeAnalysis === 'true' && changes) {
+              try {
+                const analysis = await demoService.analyzeCodeComplexity(
+                  changes
+                );
+                messages.push({
+                  role: 'assistant',
+                  content: createResourceContent(
+                    'analysis://code-complexity',
+                    JSON.stringify(analysis, null, 2),
+                    'application/json'
+                  ),
+                });
+              } catch (error) {
+                // Silently skip analysis if it fails
+              }
+            }
+
             return {
-              description: 'Generate conventional commit message',
-              messages: [
-                {
-                  role: 'user' as const,
-                  content: {
-                    type: 'text' as const,
-                    text: prompt,
-                  },
-                },
-              ],
+              description:
+                'Generate conventional commit message with optional code analysis',
+              messages,
             };
           }
         );
 
-        console.log('✅ Enhanced prompts and tools registered successfully!');
+        console.log(
+          '✅ Enhanced prompts with multimedia content types registered successfully!'
+        );
       },
     })
   )
@@ -435,7 +568,12 @@ Examples:
       console.log(
         '  • 3 Resources: System Information, Package Configuration, Project Statistics'
       );
-      console.log('  • 2 Prompts: greeting, git-commit');
+      console.log(
+        '  • 3 Enhanced Prompts: greeting, multimedia-demo, git-commit'
+      );
+      console.log(
+        '  • 🎨 Full PromptMessage Support: text, image, audio, resources'
+      );
       console.log('');
       console.log('🌐 Additional Endpoints:');
       console.log('  • GET /health - Server status and modular endpoint info');
@@ -444,10 +582,13 @@ Examples:
       console.log(
         '  • Modular handler architecture with specialized endpoints'
       );
+      console.log('  • Type-safe PromptMessage content with utility functions');
       console.log(
-        '  • Simple greeting prompt demonstrating basic functionality'
+        '  • Full multimedia support: text, images, audio, resources'
       );
-      console.log('  • Practical git-commit prompt with enhanced parameters');
-      console.log('  • Resource integration for enhanced context');
+      console.log('  • Enhanced prompts with conditional content generation');
+      console.log(
+        '  • FastMCP-inspired utility functions for content creation'
+      );
     }
   );

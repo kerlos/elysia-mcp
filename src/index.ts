@@ -13,6 +13,22 @@ export {
 } from './handlers/index.js';
 export type { HandlerContext } from './handlers/index.js';
 
+// Export content types and utilities
+export type {
+  TextContent,
+  ImageContent,
+  AudioContent,
+  ResourceContent,
+  PromptContent,
+  PromptMessage,
+} from './types.js';
+export {
+  createTextContent,
+  createImageContent,
+  createAudioContent,
+  createResourceContent,
+} from './types.js';
+
 // Re-export useful types from MCP SDK
 export type {
   ServerCapabilities,
