@@ -1,7 +1,7 @@
 {
   "name": "elysia-mcp",
   "type": "module",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "ElysiaJS plugin for Model Context Protocol with HTTP transport and stateful sessions",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -15,7 +15,8 @@
     "dist"
   ],
   "scripts": {
-    "dev": "DEBUG=http bun run --watch example/basic-server.ts",
+    "dev": "bun run --watch example/basic-server.ts",
+    "example": "bun run example/basic-server.ts",
     "build": "bun run build.ts",
     "prepublishOnly": "bun run build",
     "lint": "bunx biome lint ./src",
