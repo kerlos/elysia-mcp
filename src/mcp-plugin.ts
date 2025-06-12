@@ -65,28 +65,4 @@ export const mcp = (options: MCPPluginOptions = {}) => {
 
       return await handler.handleRequest({ request, set });
     })
-    .all(`${basePath}/tools`, async ({ request, set }) => {
-      // Ensure server setup is complete before proceeding
-      await setupPromise;
-
-      logger.log(`🔧 Tools endpoint: ${request.method} ${request.url}`);
-
-      return await handlers.tools.handleRequest({ request, set });
-    })
-    .all(`${basePath}/resources`, async ({ request, set }) => {
-      // Ensure server setup is complete before proceeding
-      await setupPromise;
-
-      logger.log(`📂 Resources endpoint: ${request.method} ${request.url}`);
-
-      return await handlers.resources.handleRequest({ request, set });
-    })
-    .all(`${basePath}/prompts`, async ({ request, set }) => {
-      // Ensure server setup is complete before proceeding
-      await setupPromise;
-
-      logger.log(`💬 Prompts endpoint: ${request.method} ${request.url}`);
-
-      return await handlers.prompts.handleRequest({ request, set });
-    });
 };
