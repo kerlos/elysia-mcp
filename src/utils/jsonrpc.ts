@@ -1,16 +1,13 @@
 import type {
-  JSONRPCRequest,
-  JSONRPCResponse,
   JSONRPCError,
   JSONRPCMessage,
-  InitializeRequest,
+  JSONRPCRequest,
+  JSONRPCResponse
 } from '@modelcontextprotocol/sdk/types.js';
-import type {
-  JSONRPCRequestSchema,
-  InitializeRequestSchema,
-  JSONRPCMessageSchema,
+import {
+  ErrorCode,
+  JSONRPCMessageSchema
 } from '@modelcontextprotocol/sdk/types.js';
-import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from './logger';
 
 /**
@@ -29,7 +26,7 @@ export type JSONRPCResponseType =
 export async function parseJSONRPCRequest(
   request: Request,
   logger?: Logger
-): Promise<JSONRPCRequest> {
+): Promise<JSONRPCMessage> {
   if (request.method !== 'POST') {
     logger?.log(
       'Method not allowed. Only POST requests are supported for MCP endpoints.'
@@ -43,10 +40,10 @@ export async function parseJSONRPCRequest(
     const rawBody = await request.json();
 
     // Validate against JSON-RPC request schema for other requests
-    //const jsonrpcRequest = JSONRPCMessageSchema.parse(rawBody);
+    const message = JSONRPCMessageSchema.parse(rawBody);
 
     //FIXME: This is a temporary fix to allow the server to work with the all request
-    return rawBody;
+    return message;
   } catch (error) {
     logger?.error('error', error);
     throw new Error(

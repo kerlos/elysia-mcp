@@ -4,6 +4,7 @@ import { ElysiaStreamingHttpTransport } from '../transport';
 import {
   ErrorCode,
   isInitializeRequest,
+  JSONRPCMessage,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   createJSONRPCError,
@@ -87,7 +88,7 @@ export class BaseHandler {
       );
     }
 
-    if (!sessionId && isInitializeRequest(body)) {
+    if (isInitializeRequest(body)) {
       return await this.handleInitialization(body, supportsSSE, set);
     }
 
@@ -131,7 +132,7 @@ export class BaseHandler {
   }
 
   protected async handleExistingSession(
-    body: unknown,
+    body: JSONRPCMessage,
     sessionId: string,
     supportsSSE: boolean,
     set: Context['set']
@@ -150,7 +151,7 @@ export class BaseHandler {
   }
 
   protected async handleInitialization(
-    body: unknown,
+    body: JSONRPCMessage,
     supportsSSE: boolean,
     set: Context['set']
   ) {

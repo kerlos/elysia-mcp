@@ -87,7 +87,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
   }
 
   async handlePostMessage(
-    body: unknown
+    body: JSONRPCMessage
   ): Promise<{ success: boolean; error?: string }> {
     this.logger.log(`[Transport:${this._sessionId}] Received message`);
 
@@ -111,12 +111,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
   }
 
-  async handleMessage(message: unknown): Promise<void> {
+  async handleMessage(message: JSONRPCMessage): Promise<void> {
     this.logger.log(`[Transport:${this._sessionId}] Parsing message`);
 
-    let parsedMessage: JSONRPCMessage;
     try {
-      parsedMessage = JSONRPCMessageSchema.parse(message);
     } catch (error) {
       this.logger.error(
         `[Transport:${this._sessionId}] Invalid message format:`,
@@ -129,7 +127,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
     this.logger.log(
       `[Transport:${this._sessionId}] Forwarding message to handler`
     );
-    this.onmessage?.(parsedMessage);
+    this.onmessage?.(message);
   }
 
   async close(): Promise<void> {
