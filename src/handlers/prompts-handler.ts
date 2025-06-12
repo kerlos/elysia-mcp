@@ -2,8 +2,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Context } from 'elysia';
 import { BaseHandler } from './base-handler';
 import {
-  type JSONRPCResponseType,
   parseJSONRPCRequest,
+  type JSONRPCResponseType,
 } from '../utils/jsonrpc';
 import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 

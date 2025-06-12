@@ -10,6 +10,7 @@ import {
   createJSONRPCError,
   createJSONRPCResponse,
   type JSONRPCResponseType,
+  parseJSONRPCMessage,
   parseJSONRPCRequest,
 } from '../utils/jsonrpc';
 import { Logger } from '../utils/logger';
@@ -74,7 +75,7 @@ export class BaseHandler {
   ): Promise<
     AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
   > {
-    const body = await parseJSONRPCRequest(request, this.logger);
+    const body = await parseJSONRPCMessage(request, this.logger);
     const sessionId = request.headers.get('mcp-session-id');
     const acceptHeader = request.headers.get('accept') || '';
     const supportsSSE = acceptHeader.includes('text/event-stream');

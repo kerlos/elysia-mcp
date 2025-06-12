@@ -6,7 +6,8 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   ErrorCode,
-  JSONRPCMessageSchema
+  JSONRPCMessageSchema,
+  JSONRPCRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from './logger';
 
@@ -24,6 +25,40 @@ export type JSONRPCResponseType =
  * Parse and validate a JSON body as JSON-RPC request
  */
 export async function parseJSONRPCRequest(
+  request: Request,
+  logger?: Logger
+): Promise<JSONRPCRequest> {
+  if (request.method !== 'POST') {
+    logger?.log(
+      'Method not allowed. Only POST requests are supported for MCP endpoints.'
+    );
+    throw new Error(
+      'Method not allowed. Only POST requests are supported for MCP endpoints.'
+    );
+  }
+
+  try {
+    const rawBody = await request.json();
+
+    // Validate against JSON-RPC request schema for other requests
+    const message = JSONRPCRequestSchema.parse(rawBody);
+
+    //FIXME: This is a temporary fix to allow the server to work with the all request
+    return message;
+  } catch (error) {
+    logger?.error('error', error);
+    throw new Error(
+      `Invalid JSON-RPC request format: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
+/**
+ * Parse and validate a JSON body as JSON-RPC message
+ */
+export async function parseJSONRPCMessage(
   request: Request,
   logger?: Logger
 ): Promise<JSONRPCMessage> {
@@ -47,7 +82,7 @@ export async function parseJSONRPCRequest(
   } catch (error) {
     logger?.error('error', error);
     throw new Error(
-      `Invalid JSON-RPC request format: ${
+      `Invalid JSON-RPC message format: ${
         error instanceof Error ? error.message : String(error)
       }`
     );
