@@ -1,7 +1,9 @@
+import { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types";
 import type {
   JSONRPCError as JSONRPCErrorRaw,
   JSONRPCMessage,
 } from "@modelcontextprotocol/sdk/types.js";
+import { Context } from "elysia";
 // Content types based on MCP specification and FastMCP patterns
 export type TextContent = {
   type: "text";
@@ -228,3 +230,5 @@ export interface StreamableHTTPServerTransportOptions {
 }
 
 export type JSONRPCError = Omit<JSONRPCErrorRaw, "id"> & { id: null };
+
+export type McpContext = Context & { store: { authInfo?: AuthInfo } }

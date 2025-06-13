@@ -9,6 +9,7 @@ import {
 import { Logger } from "./utils/logger";
 import { ElysiaStreamingHttpTransport } from "./transport";
 import { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types";
+import { McpContext } from "./types";
 
 // Plugin options
 export interface MCPPluginOptions {
@@ -20,7 +21,7 @@ export interface MCPPluginOptions {
   capabilities?: ServerCapabilities;
   enableLogging?: boolean;
   authentication?: (
-    context: Context
+    context: McpContext
   ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
   setupServer?: (server: McpServer) => void | Promise<void>;
 }
@@ -51,7 +52,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
   const logger = new Logger(enableLogging);
 
    // Shared handler function
-   const mcpHandler = async (context: Context) => {
+   const mcpHandler = async (context: McpContext) => {
     const { request, set, body } = context;
     await setupPromise;
 

@@ -12,6 +12,7 @@ import type { Context } from "elysia";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types";
 import type {
   JSONRPCError,
+  McpContext,
   StreamableHTTPServerTransportOptions,
 } from "./types";
 import type { EventStore } from "d:/projects/elysia-mcp/src/types";
@@ -31,7 +32,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
   sessionId?: string;
   onclose?: () => void;
   onerror?: (error: Error) => void;
-  onmessage?: (message: JSONRPCMessage, extra?: { authInfo?: unknown }) => void;
+  onmessage?: (
+    message: JSONRPCMessage,
+    extra?: { authInfo?: unknown }
+  ) => void;
   sessionIdGenerator: (() => string) | undefined;
   _enableJsonResponse: boolean;
   _eventStore: EventStore | undefined;
@@ -93,7 +97,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
   }
 
-  async handleRequest(context: Context) {
+  async handleRequest(context: McpContext) {
     const { request } = context;
     const method = request.method;
     switch (method) {
@@ -108,7 +112,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
   }
 
-  protected async handleGetRequest(context: Context) {
+  protected async handleGetRequest(context: McpContext) {
     const { set, headers } = context;
     const acceptHeader = headers["accept"];
     if (!acceptHeader?.includes("text/event-stream")) {
@@ -185,7 +189,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
     return stream;
   }
 
-  protected async handlePostRequest(context: Context) {
+  protected async handlePostRequest(context: McpContext) {
     const { request, set, headers, body } = context;
 
     try {
@@ -219,7 +223,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
           id: null,
         };
       }
-      const authInfo = (context.store as { authInfo?: AuthInfo }).authInfo;
+      const authInfo = context.store.authInfo;
       const rawMessage = body;
       const messages: JSONRPCMessage[] = Array.isArray(rawMessage)
         ? rawMessage
@@ -312,7 +316,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
   }
 
-  protected async handleDeleteRequest(context: Context) {
+  protected async handleDeleteRequest(context: McpContext) {
     const { request, set } = context;
     const { valid, status, response } = this.validateSession(context);
     if (!valid) {
@@ -516,7 +520,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
   private async replayEvents(
     lastEventId: string,
-    context: Context
+    context: McpContext
   ): Promise<void> {
     if (!this._eventStore) {
       return;
@@ -555,7 +559,11 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
   private logMessage(message: JSONRPCMessage) {
     if ("method" in message) {
-      this.logger.log(`method: ${message.method} ${message.params ? "params: " + JSON.stringify(message.params) : ""}`);
+      this.logger.log(
+        `method: ${message.method} ${
+          message.params ? "params: " + JSON.stringify(message.params) : ""
+        }`
+      );
     }
   }
 }
