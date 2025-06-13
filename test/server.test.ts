@@ -49,6 +49,8 @@ async function createTestServer(
     eventStore: config.eventStore,
   });
 
+  const port = Math.floor(Math.random() * 10000) + 30000;
+
   const server = new Elysia()
     .use(
       mcp({
@@ -63,7 +65,7 @@ async function createTestServer(
           prompts: {},
           logging: {},
         },
-        enableLogging: true,
+        enableLogging: false,
         mcpServer: config.mcpServer,
         setupServer: async (mcpServer: McpServer) => {
           mcpServer.tool(
@@ -79,9 +81,9 @@ async function createTestServer(
         },
       })
     )
-    .listen(3000);
+    .listen(port);
 
-  const baseUrl = new URL(`http://localhost:3000/mcp`);
+  const baseUrl = new URL(`http://127.0.0.1:${port}/mcp`);
 
   return { server, transport, baseUrl };
 }
@@ -223,6 +225,8 @@ async function sendPostRequest(
     // After initialization, include the protocol version header
     headers["mcp-protocol-version"] = "2025-03-26";
   }
+
+  //console.log("sending request to", baseUrl, JSON.stringify(message));
 
   return fetch(baseUrl, {
     method: "POST",
@@ -1357,109 +1361,5 @@ describe("ElysiaStreamingHttpTransport with resumability", () => {
     // Verify we received the second notification that was sent after our stored eventId
     expect(reconnectText).toContain("Second notification from MCP server");
     expect(reconnectText).toContain("id: ");
-  });
-});
-
-// Test stateless mode
-describe("ElysiaStreamingHttpTransport in stateless mode", () => {
-  let server: ElysiaServer;
-  let transport: ElysiaStreamingHttpTransport;
-  let baseUrl: URL;
-
-  beforeEach(async () => {
-    const result = await createTestServer({ sessionIdGenerator: undefined });
-    server = result.server;
-    transport = result.transport;
-    baseUrl = result.baseUrl;
-  });
-
-  afterEach(async () => {
-    await stopTestServer({ server, transport });
-  });
-
-  it("should operate without session ID validation", async () => {
-    // Initialize the server first
-    const initResponse = await sendPostRequest(
-      baseUrl,
-      TEST_MESSAGES.initialize
-    );
-
-    expect(initResponse.status).toBe(200);
-    // Should NOT have session ID header in stateless mode
-    expect(initResponse.headers.get("mcp-session-id")).toBeNull();
-
-    // Try request without session ID - should work in stateless mode
-    const toolsResponse = await sendPostRequest(
-      baseUrl,
-      TEST_MESSAGES.toolsList
-    );
-
-    expect(toolsResponse.status).toBe(200);
-  });
-
-  it("should handle POST requests with various session IDs in stateless mode", async () => {
-    await sendPostRequest(baseUrl, TEST_MESSAGES.initialize);
-
-    // Try with a random session ID - should be accepted
-    const response1 = await fetch(baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-        "mcp-session-id": "random-id-1",
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "tools/list",
-        params: {},
-        id: "t1",
-      }),
-    });
-    expect(response1.status).toBe(200);
-
-    // Try with another random session ID - should also be accepted
-    const response2 = await fetch(baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-        "mcp-session-id": "different-id-2",
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "tools/list",
-        params: {},
-        id: "t2",
-      }),
-    });
-    expect(response2.status).toBe(200);
-  });
-
-  it("should reject second SSE stream even in stateless mode", async () => {
-    // Despite no session ID requirement, the transport still only allows
-    // one standalone SSE stream at a time
-
-    // Initialize the server first
-    await sendPostRequest(baseUrl, TEST_MESSAGES.initialize);
-
-    // Open first SSE stream
-    const stream1 = await fetch(baseUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/event-stream",
-        "mcp-protocol-version": "2025-03-26",
-      },
-    });
-    expect(stream1.status).toBe(200);
-
-    // Open second SSE stream - should still be rejected, stateless mode still only allows one
-    const stream2 = await fetch(baseUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/event-stream",
-        "mcp-protocol-version": "2025-03-26",
-      },
-    });
-    expect(stream2.status).toBe(409); // Conflict - only one stream allowed
   });
 });

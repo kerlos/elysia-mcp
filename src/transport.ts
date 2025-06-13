@@ -32,10 +32,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
   sessionId?: string;
   onclose?: () => void;
   onerror?: (error: Error) => void;
-  onmessage?: (
-    message: JSONRPCMessage,
-    extra?: { authInfo?: unknown }
-  ) => void;
+  onmessage?: (message: JSONRPCMessage, extra?: { authInfo?: unknown }) => void;
   sessionIdGenerator: (() => string) | undefined;
   _enableJsonResponse: boolean;
   _eventStore: EventStore | undefined;
@@ -194,10 +191,9 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
     try {
       const acceptHeader = headers["accept"];
-      if (
-        !acceptHeader?.includes("application/json") ||
-        !acceptHeader.includes("text/event-stream")
-      ) {
+      const streamSupported = acceptHeader?.includes("text/event-stream");
+      const jsonSupported = acceptHeader?.includes("application/json");
+      if (!jsonSupported || !streamSupported) {
         set.status = 406;
         return {
           jsonrpc: "2.0",
@@ -290,16 +286,25 @@ export class ElysiaStreamingHttpTransport implements Transport {
           this.onmessage?.(message, { authInfo });
         }
 
-        set.headers = {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        };
         if (this.sessionId !== undefined) {
           set.headers["mcp-session-id"] = this.sessionId;
         }
         set.status = 200;
-        return stream;
+        if (streamSupported) {
+          set.headers = {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          };
+          return stream;
+        } else {
+          set.headers = {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          };
+          return;
+        }
       }
     } catch (error) {
       set.status = 400;
@@ -527,17 +532,26 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
 
     try {
-      const setHeaders: Record<string, string> = {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-      };
+      const streamSupported = context.request.headers
+        .get("accept")
+        ?.includes("text/event-stream");
 
-      if (this.sessionId !== undefined) {
-        setHeaders["mcp-session-id"] = this.sessionId;
+      if (streamSupported) {
+        context.set.headers = {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+        };
+      } else {
+        context.set.headers = {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        };
       }
-
-      context.set.headers = setHeaders;
+      if (this.sessionId !== undefined) {
+        context.set.headers["mcp-session-id"] = this.sessionId;
+      }
       context.set.status = 200;
 
       const stream = this.stream();
