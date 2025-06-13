@@ -219,9 +219,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
           id: null,
         };
       }
-
-      //TODO: Implement auth
-      const authInfo: AuthInfo | undefined = undefined;
+      const authInfo = (context.store as { authInfo?: AuthInfo }).authInfo;
       const rawMessage = body;
       const messages: JSONRPCMessage[] = Array.isArray(rawMessage)
         ? rawMessage

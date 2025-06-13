@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, status } from "elysia";
 import type { Context } from "elysia";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
@@ -8,6 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { Logger } from "./utils/logger";
 import { ElysiaStreamingHttpTransport } from "./transport";
+import { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types";
 
 // Plugin options
 export interface MCPPluginOptions {
@@ -18,6 +19,9 @@ export interface MCPPluginOptions {
   };
   capabilities?: ServerCapabilities;
   enableLogging?: boolean;
+  authentication?: (
+    context: Context
+  ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
   setupServer?: (server: McpServer) => void | Promise<void>;
 }
 
@@ -45,15 +49,15 @@ export const mcp = (options: MCPPluginOptions = {}) => {
   const basePath = options.basePath || "/mcp";
   const enableLogging = options.enableLogging ?? false;
   const logger = new Logger(enableLogging);
-  const app = new Elysia({ name: `mcp-${serverInfo.name}` });
 
-  // Shared handler function
-  const mcpHandler = async (context: Context) => {
+   // Shared handler function
+   const mcpHandler = async (context: Context) => {
     const { request, set, body } = context;
-
     await setupPromise;
 
-    logger.log(`${request.method} ${request.url} ${body ? JSON.stringify(body) : ""}`);
+    logger.log(
+      `${request.method} ${request.url} ${body ? JSON.stringify(body) : ""}`
+    );
 
     try {
       const sessionId = request.headers.get("mcp-session-id");
@@ -101,13 +105,29 @@ export const mcp = (options: MCPPluginOptions = {}) => {
           message: "Internal error",
         },
         id: null,
-      }
+      };
     }
   };
 
-  // Register both routes
-  app.all(`${basePath}/*`, mcpHandler);
-  app.all(basePath, mcpHandler);
+  const app = new Elysia({ name: `mcp-${serverInfo.name}` })
+    .state("authInfo", undefined as AuthInfo | undefined)
+    .onBeforeHandle(async (context) => {
+      if (options.authentication) {
+        const { authInfo, response } = await options.authentication(context);
+        if (authInfo) {
+          context.store.authInfo = authInfo;
+          return;
+        }
+        if (response) {
+          return response;
+        }
+        throw new Error(
+          "Invalid authentication, no authInfo or response provided"
+        );
+      }
+    })
+    .all(`${basePath}/*`, mcpHandler)
+    .all(basePath, mcpHandler);
 
   return app;
 };
