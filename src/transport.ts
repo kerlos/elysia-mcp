@@ -9,7 +9,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { Logger } from "./utils/logger";
 import type { Context } from "elysia";
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types";
 import type {
   JSONRPCError,
   McpContext,
@@ -286,19 +285,17 @@ export class ElysiaStreamingHttpTransport implements Transport {
           this.onmessage?.(message, { authInfo });
         }
 
-        set.status = 200;
-        const setHeaders: Record<string, string> = {
-          "Content-Type": streamSupported
-            ? "text/event-stream"
-            : "application/json",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        };
-        if (this.sessionId !== undefined) {
-          setHeaders["mcp-session-id"] = this.sessionId;
-        }
-        set.headers = setHeaders;
-        if (streamSupported) {
+        if (!this._enableJsonResponse) {
+          set.status = 200;
+          const setHeaders: Record<string, string> = {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          };
+          if (this.sessionId !== undefined) {
+            setHeaders["mcp-session-id"] = this.sessionId;
+          }
+          set.headers = setHeaders;
           return stream;
         }
       }
@@ -455,31 +452,37 @@ export class ElysiaStreamingHttpTransport implements Transport {
         this._standaloneSseStreamId,
         message
       );
-      this.logger.debug(`sending message RequestId: ${requestId} EventId: ${eventId} Message: ${JSON.stringify(message)}`);
+      this.logger.debug(
+        `sending message RequestId: ${requestId} EventId: ${eventId} Message: ${JSON.stringify(
+          message
+        )}`
+      );
       this.writeSSEEvent(standaloneSse, message, eventId);
       return;
     }
 
     const streamId = this._requestToStreamMapping.get(requestId);
-    if (typeof streamId !== "string") {
+    if (!streamId) {
       throw new Error(
         `No connection established for request ID: ${String(requestId)}`
       );
     }
 
-    const stream = this._streamMapping.get(streamId);
-    if (!stream) {
+    const response = this._streamMapping.get(streamId);
+    if (!response) {
       throw new Error(`No stream found for stream ID: ${streamId}`);
     }
 
-    // Generate and store event ID if event store is provided
-    const eventId = await this.storeEvent(streamId, message);
-    this.writeSSEEvent(stream, message, eventId);
+    if (!this._enableJsonResponse) {
+      // Generate and store event ID if event store is provided
+      const eventId = await this.storeEvent(streamId, message);
+      this.writeSSEEvent(response, message, eventId);
+    }
 
     if (isJSONRPCResponse(message) || isJSONRPCError(message)) {
       this._requestResponseMap.set(requestId, message);
       const relatedIds = Array.from(this._requestToStreamMapping.entries())
-        .filter(([_, sid]) => this._streamMapping.get(sid) === stream)
+        .filter(([_, sid]) => this._streamMapping.get(sid) === response)
         .map(([id]) => id);
 
       const allResponsesReady = relatedIds.every((id) =>
@@ -487,6 +490,30 @@ export class ElysiaStreamingHttpTransport implements Transport {
       );
 
       if (allResponsesReady) {
+        if (this._enableJsonResponse) {
+          // All responses ready, send as JSON
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (this.sessionId !== undefined) {
+            headers["mcp-session-id"] = this.sessionId;
+          }
+
+          const responses = relatedIds
+            .map((id) => this._requestResponseMap.get(id))
+            .filter((response) => response !== undefined);
+
+          if (responses.length === 0) {
+            response.return({});
+          }
+          if (responses.length === 1) {
+            response.return(responses[0]);
+          } else {
+            response.return(responses);
+          }
+        } else {
+          response.return({});
+        }
         for (const id of relatedIds) {
           this._requestResponseMap.delete(id);
           this._requestToStreamMapping.delete(id);

@@ -1,15 +1,13 @@
-import { Elysia, status } from "elysia";
-import type { Context } from "elysia";
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
-  ErrorCode,
   isInitializeRequest,
-  type ServerCapabilities,
+  type ServerCapabilities
 } from "@modelcontextprotocol/sdk/types.js";
-import { Logger } from "./utils/logger";
+import { Elysia } from "elysia";
 import { ElysiaStreamingHttpTransport } from "./transport";
-import { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types";
-import { McpContext } from "./types";
+import type { McpContext } from "./types";
+import { Logger } from "./utils/logger";
 
 // Plugin options
 export interface MCPPluginOptions {
