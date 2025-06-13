@@ -1,7 +1,7 @@
 {
   "name": "elysia-mcp",
   "type": "module",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "ElysiaJS plugin for Model Context Protocol with HTTP transport and stateful sessions",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -37,8 +37,7 @@
   "author": "Vatunyoo Suwannapisit <s.vatunyoo@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1",
-    "zod": "^3.25.58"
+    "@modelcontextprotocol/sdk": "^1.12.1"
   },
   "peerDependencies": {
     "elysia": ">=1.0.0"

@@ -1,33 +1,148 @@
-// Main exports for elysia-mcp
-export { mcp } from './mcp-plugin';
-export { ElysiaStreamingHttpTransport as SSEElysiaTransport } from './transport';
-export type { MCPPluginOptions } from './mcp-plugin';
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  isInitializeRequest,
+  type ServerCapabilities
+} from "@modelcontextprotocol/sdk/types.js";
+import { Elysia } from "elysia";
+import { ElysiaStreamingHttpTransport } from "./transport";
+import type { McpContext } from "./types";
+import { Logger } from "./utils/logger";
 
-// Export handlers for advanced usage
-export { handleRequest } from './handlers';
-export type { HandlerContext } from './handlers';
+// Plugin options
+export interface MCPPluginOptions {
+  basePath?: string;
+  serverInfo?: {
+    name: string;
+    version: string;
+  };
+  capabilities?: ServerCapabilities;
+  enableLogging?: boolean;
+  authentication?: (
+    context: McpContext
+  ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
+  setupServer?: (server: McpServer) => void | Promise<void>;
+  mcpServer?: McpServer;
+}
 
-// Export content types and utilities
-export type {
-  TextContent,
-  ImageContent,
-  AudioContent,
-  ResourceContent,
-  PromptContent,
-  PromptMessage,
-} from './types';
-export {
-  createTextContent,
-  createImageContent,
-  createAudioContent,
-  createResourceContent,
-} from './types';
+export const transports: Record<string, ElysiaStreamingHttpTransport> = {};
 
-// Re-export useful types from MCP SDK
-export type {
-  ServerCapabilities,
-  Tool,
-  Resource,
-  Prompt,
-} from '@modelcontextprotocol/sdk/types.js';
-export { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+// Main MCP plugin for Elysia
+export const mcp = (options: MCPPluginOptions = {}) => {
+  // Create MCP server singleton
+  const serverInfo = options.serverInfo || {
+    name: "elysia-mcp-server",
+    version: "1.0.0",
+  };
+
+  const server =
+    options.mcpServer ||
+    new McpServer(serverInfo, {
+      capabilities: options.capabilities || {},
+    });
+
+  // Setup server with tools, resources, prompts once
+  const setupPromise = (async () => {
+    if (options.setupServer) {
+      await options.setupServer(server);
+    }
+  })();
+
+  const basePath = options.basePath || "/mcp";
+  const enableLogging = options.enableLogging ?? false;
+  const logger = new Logger(enableLogging);
+
+  // Shared handler function
+  const mcpHandler = async (context: McpContext) => {
+    const { request, set, body } = context;
+    await setupPromise;
+
+    logger.log(
+      `${request.method} ${request.url} ${body ? JSON.stringify(body) : ""}`
+    );
+
+    try {
+      const sessionId = request.headers.get("mcp-session-id");
+      if (sessionId && transports[sessionId]) {
+        return await transports[sessionId].handleRequest(context);
+      }
+
+      if (!sessionId && isInitializeRequest(body)) {
+        const transport = new ElysiaStreamingHttpTransport({
+          sessionIdGenerator: () => Bun.randomUUIDv7(),
+          onsessioninitialized: (sessionId) => {
+            transports[sessionId] = transport;
+          },
+          enableLogging,
+        });
+
+        transport.onclose = () => {
+          if (transport.sessionId) {
+            delete transports[transport.sessionId];
+          }
+        };
+
+        await server.connect(transport);
+
+        return await transport.handleRequest(context);
+      }
+
+      // Invalid request
+      set.status = 400;
+      return {
+        jsonrpc: "2.0",
+        error: {
+          code: -32000,
+          message: "Bad Request: No valid session ID provided",
+        },
+        id: null,
+      };
+    } catch (error) {
+      set.status = 500;
+      logger.error("Error handling MCP request", JSON.stringify(error));
+      return {
+        jsonrpc: "2.0",
+        error: {
+          code: -32000,
+          message: "Internal error",
+        },
+        id: null,
+      };
+    }
+  };
+
+  const app = new Elysia({ name: `mcp-${serverInfo.name}` })
+    .state("authInfo", undefined as AuthInfo | undefined)
+    .onBeforeHandle(async (context) => {
+      const protocolVersion = context.request.headers.get(
+        "mcp-protocol-version"
+      );
+      if (protocolVersion && protocolVersion !== "2025-03-26") {
+        context.set.status = 400;
+        return {
+          jsonrpc: "2.0",
+          error: {
+            code: -32000,
+            message: "Bad Request: Unsupported protocol version",
+          },
+        };
+      }
+      if (options.authentication) {
+        const { authInfo, response } = await options.authentication(context);
+        if (authInfo) {
+          context.store.authInfo = authInfo;
+          return;
+        }
+        if (response) {
+          return response;
+        }
+        throw new Error(
+          "Invalid authentication, no authInfo or response provided"
+        );
+      }
+    })
+    .all(`${basePath}/*`, mcpHandler)
+    .all(basePath, mcpHandler);
+
+  return app;
+};
