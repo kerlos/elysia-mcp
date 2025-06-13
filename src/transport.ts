@@ -455,6 +455,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
         this._standaloneSseStreamId,
         message
       );
+      this.logger.debug(`sending message RequestId: ${requestId} EventId: ${eventId} Message: ${JSON.stringify(message)}`);
       this.writeSSEEvent(standaloneSse, message, eventId);
       return;
     }
