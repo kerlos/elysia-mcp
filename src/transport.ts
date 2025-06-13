@@ -83,10 +83,15 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
   }
 
+  async handleMessage(message: JSONRPCMessage): Promise<void> {
+    this.onmessage?.(message);
+  }
+
   async close(): Promise<void> {
     this.logger.log(`[Transport:${this._sessionId}] Closing transport`);
 
     this._isConnected = false;
+    this.onclose?.();
   }
 
   async send(message: JSONRPCMessage): Promise<void> {
