@@ -1070,9 +1070,9 @@ describe('MCP Plugin', () => {
         }
       }
 
-      // Most requests should be successful (202 status)
-      expect(successCount).toBeGreaterThan(iterations * 4); // At least 80% success rate
-      expect(errorCount).toBeLessThan(iterations); // Keep error rate reasonable
+      // All requests should be successful (202 status) - 100% success rate
+      expect(successCount).toBe(requests.length); // 100% success rate
+      expect(errorCount).toBe(0); // No errors allowed
 
       console.log(
         `Stress test completed: ${successCount} successful, ${errorCount} errors out of ${requests.length} requests`
@@ -1147,10 +1147,10 @@ describe('MCP Plugin', () => {
         statusCounts.set(response.status, count + 1);
       }
 
-      // Most should be 202 (accepted) or 200 (success)
+      // All should be 202 (accepted) or 200 (success) - 100% success rate
       const successfulResponses =
         (statusCounts.get(202) || 0) + (statusCounts.get(200) || 0);
-      expect(successfulResponses).toBeGreaterThan(requests.length * 0.7); // At least 70% success
+      expect(successfulResponses).toBe(requests.length); // 100% success rate
 
       console.log(
         'Mixed operations status distribution:',
@@ -1259,12 +1259,12 @@ describe('MCP Plugin', () => {
       for (const result of results) {
         totalSuccess += result.successCount;
         totalRequests += result.totalRequests;
-        expect(result.successCount).toBeGreaterThan(0); // Each session should have some success
+        expect(result.successCount).toBe(result.totalRequests); // Each session should have 100% success
       }
 
-      // Overall success rate should be reasonable
+      // Overall success rate should be 100%
       const successRate = totalSuccess / totalRequests;
-      expect(successRate).toBeGreaterThan(0.6); // At least 60% success rate
+      expect(successRate).toBe(1.0); // 100% success rate
 
       console.log(
         `Session integrity test: ${totalSuccess}/${totalRequests} requests successful (${Math.round(
