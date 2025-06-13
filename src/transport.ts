@@ -14,7 +14,7 @@ import type {
   McpContext,
   StreamableHTTPServerTransportOptions,
 } from "./types";
-import type { EventStore } from "d:/projects/elysia-mcp/src/types";
+import type { EventStore } from "./types";
 
 /**
  * Configuration options for StreamableHTTPServerTransport
