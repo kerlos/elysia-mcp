@@ -65,7 +65,7 @@ async function createTestServer(
           prompts: {},
           logging: {},
         },
-        enableLogging: false,
+        enableLogging: true,
         mcpServer: config.mcpServer,
         setupServer: async (mcpServer: McpServer) => {
           mcpServer.tool(
@@ -271,7 +271,9 @@ describe("ElysiaStreamingHttpTransport", () => {
 
     expect(response.status).toBe(200);
     const newSessionId = response.headers.get("mcp-session-id");
+    console.log("response headers", response.headers);
     expect(newSessionId).toBeDefined();
+    console.log("newSessionId", newSessionId);
     return newSessionId as string;
   }
 
@@ -844,12 +846,14 @@ describe("ElysiaStreamingHttpTransport", () => {
     it("should accept requests with matching protocol version", async () => {
       sessionId = await initializeServer();
 
+      console.log("sessionId", sessionId);
       // Send request with matching protocol version
       const response = await sendPostRequest(
         baseUrl,
         TEST_MESSAGES.toolsList,
         sessionId
       );
+      console.log(await response.json());
 
       expect(response.status).toBe(200);
     });

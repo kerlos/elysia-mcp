@@ -37,9 +37,11 @@ export const mcp = (options: MCPPluginOptions = {}) => {
     version: "1.0.0",
   };
 
-  const server = options.mcpServer || new McpServer(serverInfo, {
-    capabilities: options.capabilities || {},
-  });
+  const server =
+    options.mcpServer ||
+    new McpServer(serverInfo, {
+      capabilities: options.capabilities || {},
+    });
 
   // Setup server with tools, resources, prompts once
   const setupPromise = (async () => {
@@ -52,8 +54,8 @@ export const mcp = (options: MCPPluginOptions = {}) => {
   const enableLogging = options.enableLogging ?? false;
   const logger = new Logger(enableLogging);
 
-   // Shared handler function
-   const mcpHandler = async (context: McpContext) => {
+  // Shared handler function
+  const mcpHandler = async (context: McpContext) => {
     const { request, set, body } = context;
     await setupPromise;
 
@@ -114,6 +116,19 @@ export const mcp = (options: MCPPluginOptions = {}) => {
   const app = new Elysia({ name: `mcp-${serverInfo.name}` })
     .state("authInfo", undefined as AuthInfo | undefined)
     .onBeforeHandle(async (context) => {
+      const protocolVersion = context.request.headers.get(
+        "mcp-protocol-version"
+      );
+      if (protocolVersion && protocolVersion !== "2025-03-26") {
+        context.set.status = 400;
+        return {
+          jsonrpc: "2.0",
+          error: {
+            code: -32000,
+            message: "Bad Request: Unsupported protocol version",
+          },
+        };
+      }
       if (options.authentication) {
         const { authInfo, response } = await options.authentication(context);
         if (authInfo) {

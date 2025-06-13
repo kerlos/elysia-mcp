@@ -286,24 +286,20 @@ export class ElysiaStreamingHttpTransport implements Transport {
           this.onmessage?.(message, { authInfo });
         }
 
-        if (this.sessionId !== undefined) {
-          set.headers["mcp-session-id"] = this.sessionId;
-        }
         set.status = 200;
+        const setHeaders: Record<string, string> = {
+          "Content-Type": streamSupported
+            ? "text/event-stream"
+            : "application/json",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        };
+        if (this.sessionId !== undefined) {
+          setHeaders["mcp-session-id"] = this.sessionId;
+        }
+        set.headers = setHeaders;
         if (streamSupported) {
-          set.headers = {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-          };
           return stream;
-        } else {
-          set.headers = {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-          };
-          return;
         }
       }
     } catch (error) {
