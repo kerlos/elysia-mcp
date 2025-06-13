@@ -24,6 +24,7 @@ export interface MCPPluginOptions {
     context: McpContext
   ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
   setupServer?: (server: McpServer) => void | Promise<void>;
+  mcpServer?: McpServer;
 }
 
 export const transports: Record<string, ElysiaStreamingHttpTransport> = {};
@@ -36,7 +37,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
     version: "1.0.0",
   };
 
-  const server = new McpServer(serverInfo, {
+  const server = options.mcpServer || new McpServer(serverInfo, {
     capabilities: options.capabilities || {},
   });
 

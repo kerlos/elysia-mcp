@@ -1,6 +1,5 @@
 import {
   EventStore,
-  StreamableHTTPServerTransport,
   EventId,
   StreamId,
 } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -8,15 +7,23 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   CallToolResult,
   JSONRPCMessage,
-} from "@modelcontextprotocol/sdk/types.ts";
+} from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.ts";
 import Elysia from "elysia";
 import { mcp } from "../src";
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  spyOn,
+  mock,
+} from "bun:test";
+import { ElysiaStreamingHttpTransport } from "../src/transport";
 
 /**
- * Test server configuration for StreamableHTTPServerTransport tests
+ * Test server configuration for ElysiaStreamingHttpTransport tests
  */
 interface TestServerConfig {
   sessionIdGenerator: (() => string) | undefined;
@@ -27,6 +34,7 @@ interface TestServerConfig {
     parsedBody?: unknown
   ) => Promise<void>;
   eventStore?: EventStore;
+  mcpServer?: McpServer;
 }
 
 /**
@@ -34,12 +42,8 @@ interface TestServerConfig {
  */
 async function createTestServer(
   config: TestServerConfig = { sessionIdGenerator: () => Bun.randomUUIDv7() }
-): Promise<{
-  server: Elysia;
-  transport: StreamableHTTPServerTransport;
-  baseUrl: URL;
-}> {
-  const transport = new StreamableHTTPServerTransport({
+) {
+  const transport = new ElysiaStreamingHttpTransport({
     sessionIdGenerator: config.sessionIdGenerator,
     enableJsonResponse: config.enableJsonResponse ?? false,
     eventStore: config.eventStore,
@@ -60,6 +64,7 @@ async function createTestServer(
           logging: {},
         },
         enableLogging: true,
+        mcpServer: config.mcpServer,
         setupServer: async (mcpServer: McpServer) => {
           mcpServer.tool(
             "greet",
@@ -76,24 +81,20 @@ async function createTestServer(
     )
     .listen(3000);
 
-  const baseUrl = new URL(`http://127.0.0.1:3000`);
+  const baseUrl = new URL(`http://localhost:3000/mcp`);
 
   return { server, transport, baseUrl };
 }
+
+type ElysiaServer = Awaited<ReturnType<typeof createTestServer>>["server"];
 
 /**
  * Helper to create and start authenticated test HTTP server with MCP setup
  */
 async function createTestAuthServer(
   config: TestServerConfig = { sessionIdGenerator: () => Bun.randomUUIDv7() }
-): Promise<{
-  server: Elysia;
-  transport: StreamableHTTPServerTransport;
-  mcpServer: McpServer;
-  baseUrl: URL;
-}> {
-
-  const transport = new StreamableHTTPServerTransport({
+) {
+  const transport = new ElysiaStreamingHttpTransport({
     sessionIdGenerator: config.sessionIdGenerator,
     enableJsonResponse: config.enableJsonResponse ?? false,
     eventStore: config.eventStore,
@@ -114,6 +115,13 @@ async function createTestAuthServer(
           logging: {},
         },
         enableLogging: true,
+        authentication: async ({ headers }) => {
+          return {
+            authInfo: {
+              token: headers["authorization"]?.split(" ")[1],
+            },
+          };
+        },
         setupServer: async (mcpServer: McpServer) => {
           mcpServer.tool(
             "profile",
@@ -124,9 +132,9 @@ async function createTestAuthServer(
                 content: [
                   {
                     type: "text",
-                    text: `${active ? "Active" : "Inactive"} profile from token: ${
-                      authInfo?.token
-                    }!`,
+                    text: `${
+                      active ? "Active" : "Inactive"
+                    } profile from token: ${authInfo?.token}!`,
                   },
                 ],
               };
@@ -140,27 +148,6 @@ async function createTestAuthServer(
     .listen(3000);
 
   const baseUrl = new URL(`http://127.0.0.1:3000`);
-
-  
-
-
-  // const server = createServer(
-  //   async (req: Request & { auth?: AuthInfo }, res: Response) => {
-  //     try {
-  //       if (config.customRequestHandler) {
-  //         await config.customRequestHandler(req, res);
-  //       } else {
-  //         req.auth = {
-  //           token: req.headers["authorization"]?.split(" ")[1],
-  //         } as AuthInfo;
-  //         await transport.handleRequest(req, res);
-  //       }
-  //     } catch (error) {
-  //       console.error("Error handling request:", error);
-  //       if (!res.headersSent) res.writeHead(500).end();
-  //     }
-  //   }
-  // );
   return { server, transport, baseUrl };
 }
 
@@ -171,14 +158,14 @@ async function stopTestServer({
   server,
   transport,
 }: {
-  server: Server;
-  transport: StreamableHTTPServerTransport;
+  server: ElysiaServer;
+  transport: ElysiaStreamingHttpTransport;
 }): Promise<void> {
   // First close the transport to ensure all SSE streams are closed
   await transport.close();
 
   // Close the server without waiting indefinitely
-  server.close();
+  server.stop(true);
 }
 
 /**
@@ -258,15 +245,15 @@ function expectErrorResponse(
   });
 }
 
-describe("StreamableHTTPServerTransport", () => {
-  let server: Elysia;
-  let transport: StreamableHTTPServerTransport;
+describe("ElysiaStreamingHttpTransport", () => {
+  let server: ElysiaServer;
+  let transport: ElysiaStreamingHttpTransport;
   let baseUrl: URL;
   let sessionId: string;
 
   beforeEach(async () => {
     const result = await createTestServer();
-    server = result.app;
+    server = result.server;
     transport = result.transport;
     baseUrl = result.baseUrl;
   });
@@ -828,7 +815,7 @@ describe("StreamableHTTPServerTransport", () => {
     expect(deleteResponse.status).toBe(200);
 
     // Clean up - don't wait indefinitely for server close
-    tempServer.close();
+    tempServer.stop(true);
   });
 
   it("should reject DELETE requests with invalid session ID", async () => {
@@ -909,7 +896,7 @@ describe("StreamableHTTPServerTransport", () => {
       sessionId = await initializeServer();
 
       // Spy on console.warn to verify warning is logged
-      const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+      const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
 
       // Send request with different but supported protocol version
       const response = await fetch(baseUrl, {
@@ -974,9 +961,9 @@ describe("StreamableHTTPServerTransport", () => {
   });
 });
 
-describe("StreamableHTTPServerTransport with AuthInfo", () => {
-  let server: Server;
-  let transport: StreamableHTTPServerTransport;
+describe("ElysiaStreamingHttpTransport with AuthInfo", () => {
+  let server: ElysiaServer;
+  let transport: ElysiaStreamingHttpTransport;
   let baseUrl: URL;
   let sessionId: string;
 
@@ -1079,15 +1066,15 @@ describe("StreamableHTTPServerTransport with AuthInfo", () => {
 });
 
 // Test JSON Response Mode
-describe("StreamableHTTPServerTransport with JSON Response Mode", () => {
-  let server: Server;
-  let transport: StreamableHTTPServerTransport;
+describe("ElysiaStreamingHttpTransport with JSON Response Mode", () => {
+  let server: ElysiaServer;
+  let transport: ElysiaStreamingHttpTransport;
   let baseUrl: URL;
   let sessionId: string;
 
   beforeEach(async () => {
     const result = await createTestServer({
-      sessionIdGenerator: () => randomUUID(),
+      sessionIdGenerator: () => Bun.randomUUIDv7(),
       enableJsonResponse: true,
     });
     server = result.server;
@@ -1190,154 +1177,10 @@ describe("StreamableHTTPServerTransport with JSON Response Mode", () => {
   });
 });
 
-// Test pre-parsed body handling
-describe("StreamableHTTPServerTransport with pre-parsed body", () => {
-  let server: Server;
-  let transport: StreamableHTTPServerTransport;
-  let baseUrl: URL;
-  let sessionId: string;
-  let parsedBody: unknown = null;
-
-  beforeEach(async () => {
-    const result = await createTestServer({
-      customRequestHandler: async (req, res) => {
-        try {
-          if (parsedBody !== null) {
-            await transport.handleRequest(req, res, parsedBody);
-            parsedBody = null; // Reset after use
-          } else {
-            await transport.handleRequest(req, res);
-          }
-        } catch (error) {
-          console.error("Error handling request:", error);
-          if (!res.headersSent) res.writeHead(500).end();
-        }
-      },
-      sessionIdGenerator: () => randomUUID(),
-    });
-
-    server = result.server;
-    transport = result.transport;
-    baseUrl = result.baseUrl;
-
-    // Initialize and get session ID
-    const initResponse = await sendPostRequest(
-      baseUrl,
-      TEST_MESSAGES.initialize
-    );
-    sessionId = initResponse.headers.get("mcp-session-id") as string;
-  });
-
-  afterEach(async () => {
-    await stopTestServer({ server, transport });
-  });
-
-  it("should accept pre-parsed request body", async () => {
-    // Set up the pre-parsed body
-    parsedBody = {
-      jsonrpc: "2.0",
-      method: "tools/list",
-      params: {},
-      id: "preparsed-1",
-    };
-
-    // Send an empty body since we'll use pre-parsed body
-    const response = await fetch(baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-        "mcp-session-id": sessionId,
-      },
-      // Empty body - we're testing pre-parsed body
-      body: "",
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toBe("text/event-stream");
-
-    const reader = response.body?.getReader();
-    const { value } = await reader!.read();
-    const text = new TextDecoder().decode(value);
-
-    // Verify the response used the pre-parsed body
-    expect(text).toContain('"id":"preparsed-1"');
-    expect(text).toContain('"tools"');
-  });
-
-  it("should handle pre-parsed batch messages", async () => {
-    parsedBody = [
-      { jsonrpc: "2.0", method: "tools/list", params: {}, id: "batch-1" },
-      {
-        jsonrpc: "2.0",
-        method: "tools/call",
-        params: { name: "greet", arguments: { name: "PreParsed" } },
-        id: "batch-2",
-      },
-    ];
-
-    const response = await fetch(baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-        "mcp-session-id": sessionId,
-      },
-      body: "", // Empty as we're using pre-parsed
-    });
-
-    expect(response.status).toBe(200);
-
-    const reader = response.body?.getReader();
-    const { value } = await reader!.read();
-    const text = new TextDecoder().decode(value);
-
-    expect(text).toContain('"id":"batch-1"');
-    expect(text).toContain('"tools"');
-  });
-
-  it("should prefer pre-parsed body over request body", async () => {
-    // Set pre-parsed to tools/list
-    parsedBody = {
-      jsonrpc: "2.0",
-      method: "tools/list",
-      params: {},
-      id: "preparsed-wins",
-    };
-
-    // Send actual body with tools/call - should be ignored
-    const response = await fetch(baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-        "mcp-session-id": sessionId,
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "tools/call",
-        params: { name: "greet", arguments: { name: "Ignored" } },
-        id: "ignored-id",
-      }),
-    });
-
-    expect(response.status).toBe(200);
-
-    const reader = response.body?.getReader();
-    const { value } = await reader!.read();
-    const text = new TextDecoder().decode(value);
-
-    // Should have processed the pre-parsed body
-    expect(text).toContain('"id":"preparsed-wins"');
-    expect(text).toContain('"tools"');
-    expect(text).not.toContain('"ignored-id"');
-  });
-});
-
 // Test resumability support
-describe("StreamableHTTPServerTransport with resumability", () => {
-  let server: Server;
-  let transport: StreamableHTTPServerTransport;
+describe("ElysiaStreamingHttpTransport with resumability", () => {
+  let server: ElysiaServer;
+  let transport: ElysiaStreamingHttpTransport;
   let baseUrl: URL;
   let sessionId: string;
   let mcpServer: McpServer;
@@ -1352,7 +1195,7 @@ describe("StreamableHTTPServerTransport with resumability", () => {
       streamId: string,
       message: JSONRPCMessage
     ): Promise<string> {
-      const eventId = `${streamId}_${randomUUID()}`;
+      const eventId = `${streamId}_${Bun.randomUUIDv7()}`;
       storedEvents.set(eventId, { eventId, message });
       return eventId;
     },
@@ -1379,15 +1222,19 @@ describe("StreamableHTTPServerTransport with resumability", () => {
 
   beforeEach(async () => {
     storedEvents.clear();
+    mcpServer = new McpServer({
+      name: "elysia-mcp-test-server",
+      version: "1.0.0",
+    });
     const result = await createTestServer({
-      sessionIdGenerator: () => randomUUID(),
+      sessionIdGenerator: () => Bun.randomUUIDv7(),
       eventStore,
+      mcpServer,
     });
 
     server = result.server;
     transport = result.transport;
     baseUrl = result.baseUrl;
-    mcpServer = result.mcpServer;
 
     // Verify resumability is enabled on the transport
     expect(transport["_eventStore"]).toBeDefined();
@@ -1514,9 +1361,9 @@ describe("StreamableHTTPServerTransport with resumability", () => {
 });
 
 // Test stateless mode
-describe("StreamableHTTPServerTransport in stateless mode", () => {
-  let server: Server;
-  let transport: StreamableHTTPServerTransport;
+describe("ElysiaStreamingHttpTransport in stateless mode", () => {
+  let server: ElysiaServer;
+  let transport: ElysiaStreamingHttpTransport;
   let baseUrl: URL;
 
   beforeEach(async () => {
