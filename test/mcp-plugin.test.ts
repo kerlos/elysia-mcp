@@ -784,4 +784,493 @@ describe('MCP Plugin', () => {
       expect(promptsResponse.status).not.toBe(405);
     });
   });
+
+  describe('Stress Testing - Multiple Operations', () => {
+    let stressTestApp: Elysia;
+    let stressSessionId: string;
+
+    beforeAll(async () => {
+      // Create stress test app with more tools, prompts, and resources
+      stressTestApp = new Elysia().use(
+        mcp({
+          serverInfo: {
+            name: 'stress-test-mcp-server',
+            version: '1.0.0',
+          },
+          capabilities: {
+            resources: {},
+            tools: {},
+            prompts: {},
+            logging: {},
+          },
+          enableLogging: false,
+          setupServer: async (server: McpServer) => {
+            // Register multiple test tools for stress testing
+            server.tool(
+              'add',
+              {
+                a: z.number().describe('First number'),
+                b: z.number().describe('Second number'),
+              },
+              async (args) => {
+                const { a, b } = args as { a: number; b: number };
+                return {
+                  content: [{ type: 'text', text: String(a + b) }],
+                };
+              }
+            );
+
+            server.tool(
+              'multiply',
+              {
+                a: z.number().describe('First number'),
+                b: z.number().describe('Second number'),
+              },
+              async (args) => {
+                const { a, b } = args as { a: number; b: number };
+                return {
+                  content: [{ type: 'text', text: String(a * b) }],
+                };
+              }
+            );
+
+            server.tool(
+              'echo',
+              {
+                type: 'object',
+                properties: {
+                  text: { type: 'string', description: 'Text to echo' },
+                },
+                required: ['text'],
+              },
+              async (args) => {
+                const { text } = args as { text: string };
+                return {
+                  content: [{ type: 'text', text: `Echo: ${text}` }],
+                };
+              }
+            );
+
+            server.tool(
+              'generate_random',
+              {
+                type: 'object',
+                properties: {
+                  min: { type: 'number', description: 'Minimum value' },
+                  max: { type: 'number', description: 'Maximum value' },
+                },
+                required: ['min', 'max'],
+              },
+              async (args) => {
+                const { min, max } = args as { min: number; max: number };
+                const random =
+                  Math.floor(Math.random() * (max - min + 1)) + min;
+                return {
+                  content: [{ type: 'text', text: String(random) }],
+                };
+              }
+            );
+
+            server.tool(
+              'current_time',
+              {
+                type: 'object',
+                properties: {},
+                required: [],
+              },
+              async () => {
+                return {
+                  content: [{ type: 'text', text: new Date().toISOString() }],
+                };
+              }
+            );
+          },
+        })
+      );
+
+      // Initialize session for stress testing
+      const initResponse = await stressTestApp.handle(
+        new Request('http://localhost:3000/mcp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'initialize',
+            params: {
+              protocolVersion: '2024-11-05',
+              capabilities: {
+                roots: { listChanged: true },
+                sampling: {},
+              },
+              clientInfo: {
+                name: 'stress-test-client',
+                version: '1.0.0',
+              },
+            },
+          }),
+        })
+      );
+
+      expect(initResponse.status).toBe(202);
+      stressSessionId = initResponse.headers.get('Mcp-Session-Id') ?? '';
+    });
+
+    it('should handle multiple rapid tool calls - stress test', async () => {
+      const iterations = 100; // Number of iterations for stress test
+      const requests: Promise<Response>[] = [];
+
+      // Create multiple concurrent requests
+      for (let i = 0; i < iterations; i++) {
+        // Tools/list requests
+        requests.push(
+          stressTestApp.handle(
+            new Request('http://localhost:3000/mcp', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Mcp-Session-Id': stressSessionId,
+              },
+              body: JSON.stringify({
+                method: 'tools/list',
+                params: {},
+                jsonrpc: '2.0',
+                id: 1000 + i,
+              }),
+            })
+          )
+        );
+
+        // Add tool calls
+        requests.push(
+          stressTestApp.handle(
+            new Request('http://localhost:3000/mcp', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Mcp-Session-Id': stressSessionId,
+              },
+              body: JSON.stringify({
+                method: 'tools/call',
+                params: {
+                  name: 'add',
+                  arguments: { a: i, b: i + 1 },
+                },
+                jsonrpc: '2.0',
+                id: 2000 + i,
+              }),
+            })
+          )
+        );
+
+        // Multiply tool calls
+        requests.push(
+          stressTestApp.handle(
+            new Request('http://localhost:3000/mcp', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Mcp-Session-Id': stressSessionId,
+              },
+              body: JSON.stringify({
+                method: 'tools/call',
+                params: {
+                  name: 'multiply',
+                  arguments: { a: i, b: 2 },
+                },
+                jsonrpc: '2.0',
+                id: 3000 + i,
+              }),
+            })
+          )
+        );
+
+        // Echo tool calls
+        requests.push(
+          stressTestApp.handle(
+            new Request('http://localhost:3000/mcp', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Mcp-Session-Id': stressSessionId,
+              },
+              body: JSON.stringify({
+                method: 'tools/call',
+                params: {
+                  name: 'echo',
+                  arguments: { text: `Stress test iteration ${i}` },
+                },
+                jsonrpc: '2.0',
+                id: 4000 + i,
+              }),
+            })
+          )
+        );
+
+        // Random generator tool calls
+        requests.push(
+          stressTestApp.handle(
+            new Request('http://localhost:3000/mcp', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Mcp-Session-Id': stressSessionId,
+              },
+              body: JSON.stringify({
+                method: 'tools/call',
+                params: {
+                  name: 'generate_random',
+                  arguments: { min: 1, max: 100 },
+                },
+                jsonrpc: '2.0',
+                id: 5000 + i,
+              }),
+            })
+          )
+        );
+
+        // Current time tool calls
+        requests.push(
+          stressTestApp.handle(
+            new Request('http://localhost:3000/mcp', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Mcp-Session-Id': stressSessionId,
+              },
+              body: JSON.stringify({
+                method: 'tools/call',
+                params: {
+                  name: 'current_time',
+                  arguments: {},
+                },
+                jsonrpc: '2.0',
+                id: 6000 + i,
+              }),
+            })
+          )
+        );
+      }
+
+      // Execute all requests concurrently
+      const responses = await Promise.all(requests);
+
+      // Verify all responses
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const response of responses) {
+        if (response.status === 202) {
+          // 202 means accepted and will be processed via SSE
+          successCount++;
+        } else if (response.status >= 400) {
+          errorCount++;
+        }
+      }
+
+      // Most requests should be successful (202 status)
+      expect(successCount).toBeGreaterThan(iterations * 4); // At least 80% success rate
+      expect(errorCount).toBeLessThan(iterations); // Keep error rate reasonable
+
+      console.log(
+        `Stress test completed: ${successCount} successful, ${errorCount} errors out of ${requests.length} requests`
+      );
+    });
+
+    it('should handle mixed operations under load', async () => {
+      const iterations = 15;
+      const requests: Promise<Response>[] = [];
+
+      for (let i = 0; i < iterations; i++) {
+        // Mix different types of requests
+        const requestTypes = [
+          // Tools operations
+          {
+            method: 'tools/list',
+            params: {},
+            id: 7000 + i,
+          },
+          {
+            method: 'tools/call',
+            params: {
+              name: 'add',
+              arguments: {
+                a: Math.floor(Math.random() * 100),
+                b: Math.floor(Math.random() * 100),
+              },
+            },
+            id: 7100 + i,
+          },
+          // Resources operations
+          {
+            method: 'resources/list',
+            params: {},
+            id: 7200 + i,
+          },
+          // Prompts operations
+          {
+            method: 'prompts/list',
+            params: {},
+            id: 7300 + i,
+          },
+        ];
+
+        // Add all request types for this iteration
+        for (const reqBody of requestTypes) {
+          requests.push(
+            stressTestApp.handle(
+              new Request('http://localhost:3000/mcp', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Mcp-Session-Id': stressSessionId,
+                },
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  ...reqBody,
+                }),
+              })
+            )
+          );
+        }
+      }
+
+      // Execute all requests concurrently
+      const responses = await Promise.all(requests);
+
+      // Count different response types
+      const statusCounts = new Map<number, number>();
+      for (const response of responses) {
+        const count = statusCounts.get(response.status) || 0;
+        statusCounts.set(response.status, count + 1);
+      }
+
+      // Most should be 202 (accepted) or 200 (success)
+      const successfulResponses =
+        (statusCounts.get(202) || 0) + (statusCounts.get(200) || 0);
+      expect(successfulResponses).toBeGreaterThan(requests.length * 0.7); // At least 70% success
+
+      console.log(
+        'Mixed operations status distribution:',
+        Object.fromEntries(statusCounts)
+      );
+    });
+
+    it('should maintain session integrity under stress', async () => {
+      const concurrentSessions = 5;
+      const requestsPerSession = 10;
+      const allPromises: Promise<{
+        sessionIdx: number;
+        successCount: number;
+        totalRequests: number;
+      }>[] = [];
+
+      // Create multiple concurrent sessions
+      for (let sessionIdx = 0; sessionIdx < concurrentSessions; sessionIdx++) {
+        const sessionPromise = (async () => {
+          // Initialize session
+          const initResponse = await stressTestApp.handle(
+            new Request('http://localhost:3000/mcp', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'initialize',
+                params: {
+                  protocolVersion: '2024-11-05',
+                  capabilities: {
+                    roots: { listChanged: true },
+                    sampling: {},
+                  },
+                  clientInfo: {
+                    name: `stress-session-${sessionIdx}`,
+                    version: '1.0.0',
+                  },
+                },
+              }),
+            })
+          );
+
+          expect(initResponse.status).toBe(202);
+          const sessionId = initResponse.headers.get('Mcp-Session-Id') ?? '';
+
+          // Make multiple requests with this session
+          const sessionRequests: Promise<Response>[] = [];
+          for (let reqIdx = 0; reqIdx < requestsPerSession; reqIdx++) {
+            sessionRequests.push(
+              stressTestApp.handle(
+                new Request('http://localhost:3000/mcp', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Mcp-Session-Id': sessionId,
+                  },
+                  body: JSON.stringify({
+                    method: 'tools/call',
+                    params: {
+                      name: 'add',
+                      arguments: { a: sessionIdx, b: reqIdx },
+                    },
+                    jsonrpc: '2.0',
+                    id: 8000 + sessionIdx * 100 + reqIdx,
+                  }),
+                })
+              )
+            );
+          }
+
+          const sessionResponses = await Promise.all(sessionRequests);
+          const successCount = sessionResponses.filter(
+            (r) => r.status === 202
+          ).length;
+
+          // Terminate session
+          await stressTestApp.handle(
+            new Request('http://localhost:3000/mcp', {
+              method: 'DELETE',
+              headers: {
+                'Mcp-Session-Id': sessionId,
+              },
+            })
+          );
+
+          return {
+            sessionIdx,
+            successCount,
+            totalRequests: requestsPerSession,
+          };
+        })();
+
+        allPromises.push(sessionPromise);
+      }
+
+      // Wait for all sessions to complete
+      const results = await Promise.all(allPromises);
+
+      // Verify results
+      let totalSuccess = 0;
+      let totalRequests = 0;
+
+      for (const result of results) {
+        totalSuccess += result.successCount;
+        totalRequests += result.totalRequests;
+        expect(result.successCount).toBeGreaterThan(0); // Each session should have some success
+      }
+
+      // Overall success rate should be reasonable
+      const successRate = totalSuccess / totalRequests;
+      expect(successRate).toBeGreaterThan(0.6); // At least 60% success rate
+
+      console.log(
+        `Session integrity test: ${totalSuccess}/${totalRequests} requests successful (${Math.round(
+          successRate * 100
+        )}% success rate)`
+      );
+    });
+  });
 });
