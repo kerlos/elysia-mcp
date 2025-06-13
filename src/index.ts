@@ -7,7 +7,6 @@ import {
   type ServerCapabilities,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Logger } from "./utils/logger";
-import { createJSONRPCError } from "./utils/jsonrpc";
 import { ElysiaStreamingHttpTransport } from "./transport";
 
 // Plugin options
@@ -50,11 +49,11 @@ export const mcp = (options: MCPPluginOptions = {}) => {
 
   // Shared handler function
   const mcpHandler = async (context: Context) => {
-    const { request, set } = context;
+    const { request, set, body } = context;
 
     await setupPromise;
 
-    logger.log(`${request.method} ${request.url}`);
+    logger.log(`${request.method} ${request.url} ${body ? JSON.stringify(body) : ""}`);
 
     try {
       const sessionId = request.headers.get("mcp-session-id");
@@ -62,7 +61,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
         return await transports[sessionId].handleRequest(context);
       }
 
-      if (!sessionId && isInitializeRequest(await request.json())) {
+      if (!sessionId && isInitializeRequest(body)) {
         const transport = new ElysiaStreamingHttpTransport({
           sessionIdGenerator: () => Bun.randomUUIDv7(),
           onsessioninitialized: (sessionId) => {
@@ -77,16 +76,32 @@ export const mcp = (options: MCPPluginOptions = {}) => {
           }
         };
 
+        await server.connect(transport);
+
         return await transport.handleRequest(context);
       }
+
+      // Invalid request
+      set.status = 400;
+      return {
+        jsonrpc: "2.0",
+        error: {
+          code: -32000,
+          message: "Bad Request: No valid session ID provided",
+        },
+        id: null,
+      };
     } catch (error) {
       set.status = 500;
       logger.error("Error handling MCP request", JSON.stringify(error));
-      return createJSONRPCError(
-        error instanceof Error ? error.message : "Internal error",
-        undefined,
-        ErrorCode.InternalError
-      );
+      return {
+        jsonrpc: "2.0",
+        error: {
+          code: -32000,
+          message: "Internal error",
+        },
+        id: null,
+      }
     }
   };
 

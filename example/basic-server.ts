@@ -534,10 +534,6 @@ Examples:
             };
           }
         );
-
-        console.log(
-          '✅ Enhanced prompts with multimedia content types registered successfully!'
-        );
       },
     })
   )

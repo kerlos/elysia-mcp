@@ -186,8 +186,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
   }
 
   protected async handlePostRequest(context: Context) {
-    const { request, set, headers } = context;
-    const body = await request.json();
+    const { request, set, headers, body } = context;
 
     try {
       const acceptHeader = headers["accept"];
@@ -253,7 +252,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
             id: null,
           };
         }
-        this.sessionId = this._sessionIdGenerator?.();
+        this.sessionId = this.sessionIdGenerator?.();
+        if (this.sessionId) {
+          this._onsessioninitialized?.(this.sessionId);
+        }
         this._initialized = true;
       }
 
@@ -300,19 +302,16 @@ export class ElysiaStreamingHttpTransport implements Transport {
     } catch (error) {
       set.status = 400;
       this.onerror?.(error instanceof Error ? error : new Error(String(error)));
+      this.logger.error("Error handling MCP request", JSON.stringify(error));
       return {
         jsonrpc: "2.0",
         error: {
           code: -32700,
-          message: "Parse error",
-          data: String(error),
+          message: String(error),
         },
         id: null,
       };
     }
-  }
-  _sessionIdGenerator(): string {
-    throw new Error("Method not implemented.");
   }
 
   protected async handleDeleteRequest(context: Context) {
@@ -348,7 +347,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
     status?: number;
     response?: JSONRPCError;
   } {
-    if (this._sessionIdGenerator === undefined) {
+    if (this.sessionIdGenerator === undefined) {
       return { valid: true, status: 200 };
     }
     if (!this._initialized) {
@@ -449,7 +448,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
       }
 
       // Generate and store event ID if event store is provided
-      const eventId = await this.storeEvent(this._standaloneSseStreamId, message);
+      const eventId = await this.storeEvent(
+        this._standaloneSseStreamId,
+        message
+      );
       this.writeSSEEvent(standaloneSse, message, eventId);
       return;
     }
@@ -489,7 +491,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
   }
 
-  private async storeEvent(streamId: string, message: JSONRPCMessage): Promise<string | undefined> {
+  private async storeEvent(
+    streamId: string,
+    message: JSONRPCMessage
+  ): Promise<string | undefined> {
     if (!this._eventStore) {
       return undefined;
     }
@@ -497,12 +502,12 @@ export class ElysiaStreamingHttpTransport implements Transport {
     try {
       const eventId = await this._eventStore.storeEvent(streamId, message);
       this._eventIdToMessageMap.set(eventId, message);
-      
+
       // Track event IDs per stream for replay
       const eventIds = this._streamIdToEventIdsMap.get(streamId) || [];
       eventIds.push(eventId);
       this._streamIdToEventIdsMap.set(streamId, eventIds);
-      
+
       return eventId;
     } catch (error) {
       this.logger.error(`[Transport] Error storing event:`, error);
@@ -511,7 +516,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
   }
 
-  private async replayEvents(lastEventId: string, context: Context): Promise<void> {
+  private async replayEvents(
+    lastEventId: string,
+    context: Context
+  ): Promise<void> {
     if (!this._eventStore) {
       return;
     }
@@ -537,7 +545,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
             this.onerror?.(new Error("Failed to replay events"));
             return;
           }
-        }
+        },
       });
 
       this._streamMapping.set(streamId, stream);
@@ -549,29 +557,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
   private logMessage(message: JSONRPCMessage) {
     if ("method" in message) {
-      this.logger.log(`Method: ${message.method}`);
-
-      if (
-        message.method === "resources/read" &&
-        "params" in message &&
-        message.params?.uri
-      ) {
-        this.logger.log(`Reading resource: ${message.params.uri}`);
-      } else if (
-        message.method === "prompts/get" &&
-        "params" in message &&
-        message.params?.name
-      ) {
-        this.logger.log(`Getting prompt: ${message.params.name}`);
-        if (message.params.arguments) {
-          this.logger.log(
-            `With arguments:`,
-            Object.keys(message.params.arguments)
-          );
-        }
-      } else if (message.method === "prompts/list") {
-        this.logger.log(`Listing available prompts`);
-      }
+      this.logger.log(`method: ${message.method} ${message.params ? "params: " + JSON.stringify(message.params) : ""}`);
     }
   }
 }
