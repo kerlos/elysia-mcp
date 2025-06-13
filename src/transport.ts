@@ -14,6 +14,7 @@ import type {
   JSONRPCError,
   StreamableHTTPServerTransportOptions,
 } from "./types";
+import type { EventStore } from "d:/projects/elysia-mcp/src/types";
 
 /**
  * Configuration options for StreamableHTTPServerTransport
@@ -33,10 +34,12 @@ export class ElysiaStreamingHttpTransport implements Transport {
   onmessage?: (message: JSONRPCMessage, extra?: { authInfo?: unknown }) => void;
   sessionIdGenerator: (() => string) | undefined;
   _enableJsonResponse: boolean;
-  _eventStore:
-    | import("d:/projects/elysia-mcp/src/types").EventStore
-    | undefined;
+  _eventStore: EventStore | undefined;
   _onsessioninitialized: ((sessionId: string) => void) | undefined;
+
+  private _messageQueue: string[] = [];
+  private _eventIdToMessageMap: Map<string, JSONRPCMessage> = new Map();
+  private _streamIdToEventIdsMap: Map<string, string[]> = new Map();
 
   constructor(options: StreamableHTTPServerTransportOptions) {
     this.sessionIdGenerator = options.sessionIdGenerator;
@@ -76,15 +79,8 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
   }
 
-  private _messageQueue: string[] = [];
-
   // Generator function for Elysia streaming
   async *stream() {
-    // Send initial endpoint event
-    // yield `event: endpoint\ndata: ${encodeURI(this._endpoint)}?sessionId=${
-    //   this.sessionId
-    // }\n\n`;
-
     while (this._started) {
       if (this._messageQueue.length > 0) {
         const message = this._messageQueue.shift();
@@ -96,9 +92,6 @@ export class ElysiaStreamingHttpTransport implements Transport {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
   }
-  // _endpoint(_endpoint: any) {
-  //   throw new Error("Method not implemented.");
-  // }
 
   async handleRequest(context: Context) {
     const { request } = context;
@@ -134,6 +127,15 @@ export class ElysiaStreamingHttpTransport implements Transport {
     if (!valid) {
       set.status = status;
       return response;
+    }
+
+    // Handle resumability: check for Last-Event-ID header
+    if (this._eventStore) {
+      const lastEventId = headers["last-event-id"] as string | undefined;
+      if (lastEventId) {
+        await this.replayEvents(lastEventId, context);
+        return;
+      }
     }
 
     const path = context.request.url;
@@ -419,6 +421,8 @@ export class ElysiaStreamingHttpTransport implements Transport {
     this._streamMapping.clear();
     this._requestResponseMap.clear();
     this._requestToStreamMapping.clear();
+    this._eventIdToMessageMap.clear();
+    this._streamIdToEventIdsMap.clear();
     this._started = false;
     this.onclose?.();
   }
@@ -443,7 +447,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
       if (standaloneSse === undefined) {
         return;
       }
-      this.writeSSEEvent(standaloneSse, message);
+
+      // Generate and store event ID if event store is provided
+      const eventId = await this.storeEvent(this._standaloneSseStreamId, message);
+      this.writeSSEEvent(standaloneSse, message, eventId);
       return;
     }
 
@@ -459,7 +466,9 @@ export class ElysiaStreamingHttpTransport implements Transport {
       throw new Error(`No stream found for stream ID: ${streamId}`);
     }
 
-    this.writeSSEEvent(stream, message);
+    // Generate and store event ID if event store is provided
+    const eventId = await this.storeEvent(streamId, message);
+    this.writeSSEEvent(stream, message, eventId);
 
     if (isJSONRPCResponse(message) || isJSONRPCError(message)) {
       this._requestResponseMap.set(requestId, message);
@@ -477,6 +486,64 @@ export class ElysiaStreamingHttpTransport implements Transport {
           this._requestToStreamMapping.delete(id);
         }
       }
+    }
+  }
+
+  private async storeEvent(streamId: string, message: JSONRPCMessage): Promise<string | undefined> {
+    if (!this._eventStore) {
+      return undefined;
+    }
+
+    try {
+      const eventId = await this._eventStore.storeEvent(streamId, message);
+      this._eventIdToMessageMap.set(eventId, message);
+      
+      // Track event IDs per stream for replay
+      const eventIds = this._streamIdToEventIdsMap.get(streamId) || [];
+      eventIds.push(eventId);
+      this._streamIdToEventIdsMap.set(streamId, eventIds);
+      
+      return eventId;
+    } catch (error) {
+      this.logger.error(`[Transport] Error storing event:`, error);
+      this.onerror?.(error instanceof Error ? error : new Error(String(error)));
+      return undefined;
+    }
+  }
+
+  private async replayEvents(lastEventId: string, context: Context): Promise<void> {
+    if (!this._eventStore) {
+      return;
+    }
+
+    try {
+      const setHeaders: Record<string, string> = {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      };
+
+      if (this.sessionId !== undefined) {
+        setHeaders["mcp-session-id"] = this.sessionId;
+      }
+
+      context.set.headers = setHeaders;
+      context.set.status = 200;
+
+      const stream = this.stream();
+      const streamId = await this._eventStore.replayEventsAfter(lastEventId, {
+        send: async (eventId: string, message: JSONRPCMessage) => {
+          if (!this.writeSSEEvent(stream, message, eventId)) {
+            this.onerror?.(new Error("Failed to replay events"));
+            return;
+          }
+        }
+      });
+
+      this._streamMapping.set(streamId, stream);
+    } catch (error) {
+      this.logger.error(`[Transport] Error replaying events:`, error);
+      this.onerror?.(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
