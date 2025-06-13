@@ -83,40 +83,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
   }
 
-  async handlePostMessage(
-    body: JSONRPCMessage
-  ): Promise<{ success: boolean; error?: string }> {
-    this.logger.log(`[Transport:${this._sessionId}] Received message`);
-
-    if (!this._isConnected) {
-      this.logger.error(`[Transport:${this._sessionId}] Not connected`);
-      return { success: false, error: 'SSE connection not established' };
-    }
-
-    try {
-      // Handle the message
-      await this.handleMessage(body);
-
-      // Return success
-      return { success: true };
-    } catch (error) {
-      this.logger.error(
-        `[Transport:${this._sessionId}] Error handling message:`,
-        error
-      );
-      return { success: false, error: String(error) };
-    }
-  }
-
-  async handleMessage(message: JSONRPCMessage): Promise<void> {
-    this.onmessage?.(message);
-  }
-
   async close(): Promise<void> {
     this.logger.log(`[Transport:${this._sessionId}] Closing transport`);
 
     this._isConnected = false;
-    this.onclose?.();
   }
 
   async send(message: JSONRPCMessage): Promise<void> {

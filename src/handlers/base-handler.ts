@@ -219,12 +219,11 @@ const handleExistingSession = async (
   const transport = transports[sessionId];
 
   if (supportsSSE) {
-    await transport.handleMessage(body);
+    //await transport.handleMessage(body);
     setSSEHeaders(set);
     return transport.stream();
   }
 
-  await transport.handleMessage(body);
   set.status = 202;
   return;
 };
@@ -259,9 +258,6 @@ const handleInitialization = async (
   await server.connect(transport);
 
   logger.log(`MCP session initialized: ${newSessionId}`);
-
-  // Handle the initialization message through the transport
-  await transport.handleMessage(body);
 
   // Set session ID in response header
   set.headers['Mcp-Session-Id'] = newSessionId;
