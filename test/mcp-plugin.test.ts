@@ -427,7 +427,7 @@ describe('MCP Plugin', () => {
 
       expect(response.status).toBe(405);
       const body = await response.json();
-      expect(body.error).toBe('Method not allowed');
+      expect(body.error.message).toBe('Method not allowed');
     });
 
     it('should handle PATCH method as unsupported', async () => {
@@ -443,7 +443,7 @@ describe('MCP Plugin', () => {
 
       expect(response.status).toBe(405);
       const body = await response.json();
-      expect(body.error).toBe('Method not allowed');
+      expect(body.error.message).toBe('Method not allowed');
     });
   });
 

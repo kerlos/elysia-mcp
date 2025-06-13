@@ -1,14 +1,13 @@
 import { Elysia } from 'elysia';
+import type { Context } from 'elysia';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import {
-  BaseHandler,
-  ToolsHandler,
-  ResourcesHandler,
-  PromptsHandler,
-  getHandlerType,
-} from './handlers/index';
+  ErrorCode,
+  type ServerCapabilities,
+} from '@modelcontextprotocol/sdk/types.js';
+import { handleRequest } from './handlers';
 import { Logger } from './utils/logger';
+import { createJSONRPCError } from './utils/jsonrpc';
 
 // Plugin options
 export interface MCPPluginOptions {
@@ -19,7 +18,6 @@ export interface MCPPluginOptions {
   };
   capabilities?: ServerCapabilities;
   enableLogging?: boolean;
-  authentication?: unknown; //TODO: Add authentication type
   setupServer?: (server: McpServer) => void | Promise<void>;
 }
 
@@ -42,27 +40,34 @@ export const mcp = (options: MCPPluginOptions = {}) => {
     }
   })();
 
-  // Create handlers for different request types
-  const createHandlers = (basePath: string, enableLogging: boolean) => ({
-    general: new BaseHandler(server, enableLogging, basePath),
-    tools: new ToolsHandler(server, enableLogging, basePath),
-    resources: new ResourcesHandler(server, enableLogging, basePath),
-    prompts: new PromptsHandler(server, enableLogging, basePath),
-  });
-
   const basePath = options.basePath || '/mcp';
-  const handlers = createHandlers(basePath, options.enableLogging || false);
-  const logger = new Logger(options.enableLogging || false);
+  const enableLogging = options.enableLogging ?? false;
 
-  return new Elysia({ name: `mcp-${serverInfo.name}` })
-    .all(basePath, async ({ request, set }) => {
-      // Ensure server setup is complete before proceeding
+  const app = new Elysia({ name: `mcp-${serverInfo.name}` });
+
+  // Shared handler function
+  const mcpHandler = async ({ request, set }: Context) => {
+    try {
       await setupPromise;
+      return await handleRequest({
+        request,
+        set,
+        server,
+        enableLogging,
+        basePath,
+      });
+    } catch (error) {
+      return createJSONRPCError(
+        error instanceof Error ? error.message : 'Internal error',
+        undefined,
+        ErrorCode.InternalError
+      );
+    }
+  };
 
-      // Determine handler type and use appropriate handler
-      const handlerType = getHandlerType(request.url);
-      const handler = handlers[handlerType];
+  // Register both routes
+  app.all(`${basePath}/*`, mcpHandler);
+  app.all(basePath, mcpHandler);
 
-      return await handler.handleRequest({ request, set });
-    })
+  return app;
 };

@@ -4,14 +4,8 @@ export { ElysiaStreamingHttpTransport as SSEElysiaTransport } from './transport'
 export type { MCPPluginOptions } from './mcp-plugin';
 
 // Export handlers for advanced usage
-export {
-  BaseHandler,
-  ToolsHandler,
-  ResourcesHandler,
-  PromptsHandler,
-  getHandlerType,
-} from './handlers/index';
-export type { HandlerContext } from './handlers/index';
+export { handleRequest } from './handlers';
+export type { HandlerContext } from './handlers';
 
 // Export content types and utilities
 export type {

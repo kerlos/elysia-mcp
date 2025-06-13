@@ -1,8 +1,5 @@
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import {
-  JSONRPCMessageSchema,
-  type JSONRPCMessage,
-} from '@modelcontextprotocol/sdk/types.js';
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from './utils/logger';
 
 export class ElysiaStreamingHttpTransport implements Transport {
@@ -112,21 +109,6 @@ export class ElysiaStreamingHttpTransport implements Transport {
   }
 
   async handleMessage(message: JSONRPCMessage): Promise<void> {
-    this.logger.log(`[Transport:${this._sessionId}] Parsing message`);
-
-    try {
-    } catch (error) {
-      this.logger.error(
-        `[Transport:${this._sessionId}] Invalid message format:`,
-        error
-      );
-      this.onerror?.(error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    }
-
-    this.logger.log(
-      `[Transport:${this._sessionId}] Forwarding message to handler`
-    );
     this.onmessage?.(message);
   }
 

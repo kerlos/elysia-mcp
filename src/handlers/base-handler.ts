@@ -4,22 +4,20 @@ import { ElysiaStreamingHttpTransport } from '../transport';
 import {
   ErrorCode,
   isInitializeRequest,
-  JSONRPCMessage,
+  type JSONRPCMessage,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   createJSONRPCError,
   createJSONRPCResponse,
   type JSONRPCResponseType,
   parseJSONRPCMessage,
-  parseJSONRPCRequest,
 } from '../utils/jsonrpc';
 import { Logger } from '../utils/logger';
 
 // Session management
-export const transports: { [sessionId: string]: ElysiaStreamingHttpTransport } =
-  {};
+export const transports: Record<string, ElysiaStreamingHttpTransport> = {};
 
-// Base handler interface
+// Handler context type
 export interface HandlerContext {
   request: Request;
   set: Context['set'];
@@ -28,212 +26,252 @@ export interface HandlerContext {
   basePath: string;
 }
 
-// Common handler functionality
-export class BaseHandler {
-  protected logger: Logger;
+// Helper functions
+const setSSEHeaders = (set: Context['set']) => {
+  set.headers['Content-Type'] = 'text/event-stream';
+  set.headers['Cache-Control'] = 'no-cache';
+  set.headers['Connection'] = 'keep-alive';
+  set.headers['Access-Control-Allow-Origin'] = '*';
+};
 
-  constructor(
-    protected server: McpServer,
-    protected enableLogging = false,
-    protected basePath = '/mcp'
-  ) {
-    this.logger = new Logger(enableLogging);
-  }
+const createErrorResponse = (
+  error: unknown,
+  code: ErrorCode = ErrorCode.InternalError,
+  id: number | string = 0
+) => {
+  return createJSONRPCError(
+    error instanceof Error ? error.message : String(error),
+    id,
+    code
+  );
+};
 
-  async handleRequest({
-    request,
-    set,
-  }: {
-    request: Request;
-    set: Context['set'];
-  }): Promise<
-    AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
-  > {
-    const method = request.method;
+// Main handler functions
+export const handleRequest = async ({
+  request,
+  set,
+  server,
+  enableLogging = false,
+  basePath = '/mcp',
+}: HandlerContext): Promise<
+  AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
+> => {
+  const logger = new Logger(enableLogging);
+  const method = request.method;
 
-    try {
-      switch (method) {
-        case 'POST':
-          return await this.handlePost(request, set);
-        case 'GET':
-          return await this.handleGet(request, set);
-        case 'DELETE':
-          return await this.handleDelete(request, set);
-        default:
-          set.status = 405;
-          return { error: 'Method not allowed' };
-      }
-    } catch (error) {
-      set.status = 500;
-      return this.createErrorResponse(error);
+  logger.log(`${method} ${request.url}`);
+
+  try {
+    const ctx = {
+      request,
+      set,
+      server,
+      enableLogging,
+      basePath,
+    };
+    switch (method) {
+      case 'POST':
+        return await handlePost(ctx);
+      case 'GET':
+        return await handleGet(ctx);
+      case 'DELETE':
+        return await handleDelete(ctx);
+      default:
+        set.status = 405;
+        return createErrorResponse(
+          'Method not allowed',
+          ErrorCode.MethodNotFound
+        );
     }
+  } catch (error) {
+    set.status = 500;
+    return createErrorResponse(error);
   }
+};
 
-  protected async handlePost(
-    request: Request,
-    set: Context['set']
-  ): Promise<
-    AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
-  > {
-    const body = await parseJSONRPCMessage(request, this.logger);
+const handlePost = async ({
+  request,
+  set,
+  server,
+  enableLogging = false,
+  basePath,
+}: HandlerContext): Promise<
+  AsyncGenerator<string, void, unknown> | JSONRPCResponseType | undefined
+> => {
+  const logger = new Logger(enableLogging);
+
+  try {
+    const body = await parseJSONRPCMessage(request, logger);
+
+    if ('method' in body) {
+      logger.log(`Method: ${body.method}`);
+
+      if (
+        body.method === 'resources/read' &&
+        'params' in body &&
+        body.params?.uri
+      ) {
+        logger.log(`Reading resource: ${body.params.uri}`);
+      } else if (
+        body.method === 'prompts/get' &&
+        'params' in body &&
+        body.params?.name
+      ) {
+        logger.log(`Getting prompt: ${body.params.name}`);
+        if (body.params.arguments) {
+          logger.log(`With arguments:`, Object.keys(body.params.arguments));
+        }
+      } else if (body.method === 'prompts/list') {
+        logger.log(`Listing available prompts`);
+      }
+    }
+
     const sessionId = request.headers.get('mcp-session-id');
     const acceptHeader = request.headers.get('accept') || '';
     const supportsSSE = acceptHeader.includes('text/event-stream');
 
     if (sessionId && transports[sessionId]) {
-      return await this.handleExistingSession(
-        body,
-        sessionId,
-        supportsSSE,
-        set
-      );
+      return await handleExistingSession(body, sessionId, supportsSSE, set);
     }
 
     if (isInitializeRequest(body)) {
-      return await this.handleInitialization(body, supportsSSE, set);
+      return await handleInitialization(
+        body,
+        supportsSSE,
+        set,
+        server,
+        basePath,
+        enableLogging
+      );
     }
 
-    // Invalid request
     set.status = 400;
-    return this.createErrorResponse(
-      'No valid session ID provided or invalid initialize request'
+    return createErrorResponse(
+      'No valid session ID provided or invalid initialize request',
+      ErrorCode.InvalidRequest
     );
+  } catch (error) {
+    set.status = 500;
+    return createErrorResponse('Invalid JSON in request', ErrorCode.ParseError);
+  }
+};
+
+const handleGet = async ({
+  request,
+  set,
+  enableLogging = false,
+}: HandlerContext) => {
+  const logger = new Logger(enableLogging);
+  const url = new URL(request.url);
+  const path = url.pathname;
+
+  if (path.includes('/resources')) {
+    const resourcePath = url.searchParams.get('uri');
+    if (resourcePath) {
+      logger.log(`Direct resource access: ${resourcePath}`);
+    }
+  } else if (path.includes('/prompts')) {
+    const promptName = url.searchParams.get('name');
+    if (promptName) {
+      logger.log(`Direct prompt access: ${promptName}`);
+    } else {
+      logger.log(`Direct prompts listing`);
+    }
   }
 
-  protected async handleGet(request: Request, set: Context['set']) {
-    const sessionId = request.headers.get('mcp-session-id');
+  const sessionId = request.headers.get('mcp-session-id');
 
-    if (!sessionId || !transports[sessionId]) {
-      set.status = 400;
-      return { error: 'Invalid or missing session ID' };
-    }
+  if (!sessionId || !transports[sessionId]) {
+    set.status = 400;
+    return { error: 'Invalid or missing session ID' };
+  }
 
-    const transport = transports[sessionId];
-    this.setSSEHeaders(set);
+  const transport = transports[sessionId];
+  setSSEHeaders(set);
+  return transport.stream();
+};
+
+const handleDelete = async ({
+  request,
+  set,
+}: HandlerContext): Promise<JSONRPCResponseType> => {
+  const sessionId = request.headers.get('mcp-session-id');
+
+  if (!sessionId || !transports[sessionId]) {
+    set.status = 400;
+    return { error: 'Invalid or missing session ID' };
+  }
+
+  const transport = transports[sessionId];
+  await transport.close();
+  return createJSONRPCResponse(0, {
+    success: true,
+    message: 'Session terminated',
+  });
+};
+
+const handleExistingSession = async (
+  body: JSONRPCMessage,
+  sessionId: string,
+  supportsSSE: boolean,
+  set: Context['set']
+) => {
+  const transport = transports[sessionId];
+
+  if (supportsSSE) {
+    await transport.handleMessage(body);
+    setSSEHeaders(set);
     return transport.stream();
   }
 
-  protected async handleDelete(
-    request: Request,
-    set: Context['set']
-  ): Promise<JSONRPCResponseType> {
-    const sessionId = request.headers.get('mcp-session-id');
+  await transport.handleMessage(body);
+  set.status = 202;
+  return;
+};
 
-    if (!sessionId || !transports[sessionId]) {
-      set.status = 400;
-      return { error: 'Invalid or missing session ID' };
-    }
+const handleInitialization = async (
+  body: JSONRPCMessage,
+  supportsSSE: boolean,
+  set: Context['set'],
+  server: McpServer,
+  basePath: string,
+  enableLogging: boolean
+) => {
+  const logger = new Logger(enableLogging);
 
-    const transport = transports[sessionId];
-    await transport.close();
-    return createJSONRPCResponse(0, {
-      success: true,
-      message: 'Session terminated',
-    });
+  // Create new transport
+  const transport = new ElysiaStreamingHttpTransport(basePath, enableLogging);
+  const newSessionId = transport.sessionId;
+
+  // Store transport by session ID
+  transports[newSessionId] = transport;
+
+  // Set up transport event handlers
+  transport.onclose = () => {
+    delete transports[newSessionId];
+    logger.log(`MCP session terminated: ${newSessionId}`);
+  };
+
+  // Start the transport
+  await transport.start();
+
+  // Connect the server to the new transport
+  await server.connect(transport);
+
+  logger.log(`MCP session initialized: ${newSessionId}`);
+
+  // Handle the initialization message through the transport
+  await transport.handleMessage(body);
+
+  // Set session ID in response header
+  set.headers['Mcp-Session-Id'] = newSessionId;
+
+  if (supportsSSE) {
+    setSSEHeaders(set);
+    return transport.stream();
   }
 
-  protected async handleExistingSession(
-    body: JSONRPCMessage,
-    sessionId: string,
-    supportsSSE: boolean,
-    set: Context['set']
-  ) {
-    const transport = transports[sessionId];
-
-    if (supportsSSE) {
-      await transport.handleMessage(body);
-      this.setSSEHeaders(set);
-      return transport.stream();
-    }
-
-    await transport.handleMessage(body);
-    set.status = 202;
-    return;
-  }
-
-  protected async handleInitialization(
-    body: JSONRPCMessage,
-    supportsSSE: boolean,
-    set: Context['set']
-  ) {
-    // Create new transport
-    const transport = new ElysiaStreamingHttpTransport(
-      this.basePath,
-      this.enableLogging
-    );
-    const newSessionId = transport.sessionId;
-
-    // Store transport by session ID
-    transports[newSessionId] = transport;
-
-    // Set up transport event handlers
-    transport.onclose = () => {
-      delete transports[newSessionId];
-      this.logger.log(`MCP session terminated: ${newSessionId}`);
-    };
-
-    // Start the transport
-    await transport.start();
-
-    // Connect the server to the new transport
-    await this.server.connect(transport);
-
-    this.logger.log(`MCP session initialized: ${newSessionId}`);
-
-    // Handle the initialization message through the transport
-    await transport.handleMessage(body);
-
-    // Set session ID in response header
-    set.headers['Mcp-Session-Id'] = newSessionId;
-
-    if (supportsSSE) {
-      this.setSSEHeaders(set);
-      return transport.stream();
-    }
-
-    // For non-SSE initialization, return 202 accepted
-    set.status = 202;
-    return;
-  }
-
-  protected setSSEHeaders(set: Context['set']) {
-    set.headers['Content-Type'] = 'text/event-stream';
-    set.headers['Cache-Control'] = 'no-cache';
-    set.headers['Connection'] = 'keep-alive';
-    set.headers['Access-Control-Allow-Origin'] = '*';
-  }
-
-  protected createErrorResponse(
-    error: unknown,
-    code: ErrorCode = ErrorCode.InternalError,
-    id: number | string = 0
-  ) {
-    return createJSONRPCError(
-      error instanceof Error ? error.message : String(error),
-      id,
-      code
-    );
-  }
-}
-
-// Utility function to determine handler type from URL
-export function getHandlerType(
-  urlString: string
-): 'tools' | 'resources' | 'prompts' | 'general' {
-  try {
-    const url = new URL(urlString);
-    const pathname = url.pathname;
-
-    if (pathname.includes('/tools')) return 'tools';
-    if (pathname.includes('/resources')) return 'resources';
-    if (pathname.includes('/prompts')) return 'prompts';
-
-    return 'general';
-  } catch {
-    // Fallback for invalid URLs
-    if (urlString.includes('/tools')) return 'tools';
-    if (urlString.includes('/resources')) return 'resources';
-    if (urlString.includes('/prompts')) return 'prompts';
-    return 'general';
-  }
-}
+  // For non-SSE initialization, return 202 accepted
+  set.status = 202;
+  return;
+};
