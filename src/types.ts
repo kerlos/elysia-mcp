@@ -1,23 +1,27 @@
+import type {
+  JSONRPCError as JSONRPCErrorRaw,
+  JSONRPCMessage,
+} from "@modelcontextprotocol/sdk/types.js";
 // Content types based on MCP specification and FastMCP patterns
 export type TextContent = {
-  type: 'text';
+  type: "text";
   text: string;
 };
 
 export type ImageContent = {
-  type: 'image';
+  type: "image";
   data: string;
   mimeType: string;
 };
 
 export type AudioContent = {
-  type: 'audio';
+  type: "audio";
   data: string;
   mimeType: string;
 };
 
 export type ResourceContent = {
-  type: 'resource';
+  type: "resource";
   resource: {
     uri: string;
     mimeType: string;
@@ -27,7 +31,7 @@ export type ResourceContent = {
 
 // Resource link content type from MCP specification
 export type ResourceLinkContent = {
-  type: 'resource_link';
+  type: "resource_link";
   uri: string;
   name?: string;
   description?: string;
@@ -57,20 +61,20 @@ export type PromptContent =
   | ResourceContent;
 
 export type PromptMessage = {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: PromptContent;
 };
 
 // Tool definition types from MCP specification
 export type ToolInputSchema = {
-  type: 'object';
+  type: "object";
   properties: Record<string, unknown>;
   required?: string[];
   [key: string]: unknown;
 };
 
 export type ToolOutputSchema = {
-  type: 'object';
+  type: "object";
   properties: Record<string, unknown>;
   required?: string[];
   [key: string]: unknown;
@@ -87,9 +91,9 @@ export type Tool = {
 // Utility function inspired by FastMCP for creating image content
 export const createImageContent = (
   data: string,
-  mimeType = 'image/png'
+  mimeType = "image/png"
 ): ImageContent => ({
-  type: 'image' as const,
+  type: "image" as const,
   data,
   mimeType,
 });
@@ -97,9 +101,9 @@ export const createImageContent = (
 // Utility function for creating audio content
 export const createAudioContent = (
   data: string,
-  mimeType = 'audio/wav'
+  mimeType = "audio/wav"
 ): AudioContent => ({
-  type: 'audio' as const,
+  type: "audio" as const,
   data,
   mimeType,
 });
@@ -108,9 +112,9 @@ export const createAudioContent = (
 export const createResourceContent = (
   uri: string,
   text: string,
-  mimeType = 'application/json'
+  mimeType = "application/json"
 ): ResourceContent => ({
-  type: 'resource' as const,
+  type: "resource" as const,
   resource: {
     uri,
     mimeType,
@@ -125,7 +129,7 @@ export const createResourceLinkContent = (
   description?: string,
   mimeType?: string
 ): ResourceLinkContent => ({
-  type: 'resource_link' as const,
+  type: "resource_link" as const,
   uri,
   ...(name && { name }),
   ...(description && { description }),
@@ -134,7 +138,7 @@ export const createResourceLinkContent = (
 
 // Utility function for creating text content
 export const createTextContent = (text: string): TextContent => ({
-  type: 'text' as const,
+  type: "text" as const,
   text,
 });
 
@@ -167,3 +171,60 @@ export const createStructuredToolResult = (
   structuredContent,
   isError: false,
 });
+
+export type StreamId = string;
+export type EventId = string;
+
+export interface EventStore {
+  /**
+   * Stores an event for later retrieval
+   * @param streamId ID of the stream the event belongs to
+   * @param message The JSON-RPC message to store
+   * @returns The generated event ID for the stored event
+   */
+  storeEvent(streamId: StreamId, message: JSONRPCMessage): Promise<EventId>;
+
+  replayEventsAfter(
+    lastEventId: EventId,
+    {
+      send,
+    }: {
+      send: (eventId: EventId, message: JSONRPCMessage) => Promise<void>;
+    }
+  ): Promise<StreamId>;
+}
+export interface StreamableHTTPServerTransportOptions {
+  /**
+   * Function that generates a session ID for the transport.
+   * The session ID SHOULD be globally unique and cryptographically secure (e.g., a securely generated UUID, a JWT, or a cryptographic hash)
+   *
+   * Return undefined to disable session management.
+   */
+  sessionIdGenerator: (() => string) | undefined;
+
+  /**
+   * A callback for session initialization events
+   * This is called when the server initializes a new session.
+   * Useful in cases when you need to register multiple mcp sessions
+   * and need to keep track of them.
+   * @param sessionId The generated session ID
+   */
+  onsessioninitialized?: (sessionId: string) => void;
+
+  /**
+   * If true, the server will return JSON responses instead of starting an SSE stream.
+   * This can be useful for simple request/response scenarios without streaming.
+   * Default is false (SSE streams are preferred).
+   */
+  enableJsonResponse?: boolean;
+
+  /**
+   * Event store for resumability support
+   * If provided, resumability will be enabled, allowing clients to reconnect and resume messages
+   */
+  eventStore?: EventStore;
+
+  enableLogging?: boolean;
+}
+
+export type JSONRPCError = Omit<JSONRPCErrorRaw, "id"> & { id: null };

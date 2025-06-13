@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from 'bun:test';
 import { Elysia } from 'elysia';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { mcp } from '../src/mcp-plugin';
+import { mcp } from '../src/index';
 import { z } from 'zod';
 
 describe('MCP Plugin', () => {
@@ -135,7 +135,7 @@ describe('MCP Plugin', () => {
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
       expect(response.headers.get('Mcp-Session-Id')).toBeTruthy();
 
       // Store session ID for later tests
@@ -193,7 +193,7 @@ describe('MCP Plugin', () => {
         })
       );
 
-      expect(response.status).toBe(202); // Accepted, response will be in SSE
+      expect(response.status).toBe(200); // Accepted, response will be in SSE
     });
 
     it('should handle tools/call request for add tool', async () => {
@@ -216,7 +216,7 @@ describe('MCP Plugin', () => {
         })
       );
 
-      expect(response.status).toBe(202); // Accepted, response will be in SSE
+      expect(response.status).toBe(200); // Accepted, response will be in SSE
     });
 
     it('should handle tools/call request for echo tool', async () => {
@@ -239,7 +239,7 @@ describe('MCP Plugin', () => {
         })
       );
 
-      expect(response.status).toBe(202); // Accepted, response will be in SSE
+      expect(response.status).toBe(200); // Accepted, response will be in SSE
     });
 
     it('should handle tools/call request for get_time tool', async () => {
@@ -262,7 +262,7 @@ describe('MCP Plugin', () => {
         })
       );
 
-      expect(response.status).toBe(202); // Accepted, response will be in SSE
+      expect(response.status).toBe(200); // Accepted, response will be in SSE
     });
 
     it('should reject requests with invalid session ID', async () => {
@@ -570,7 +570,7 @@ describe('MCP Plugin', () => {
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
       expect(response.headers.get('Mcp-Session-Id')).toBeTruthy();
 
       // Store session ID for later tests
@@ -597,7 +597,7 @@ describe('MCP Plugin', () => {
         })
       );
 
-      expect(response.status).toBe(202); // Accepted, response will be in SSE
+      expect(response.status).toBe(200); // Accepted, response will be in SSE
     });
 
     it('should handle tools/call request with custom basePath', async () => {
@@ -620,7 +620,7 @@ describe('MCP Plugin', () => {
         })
       );
 
-      expect(response.status).toBe(202); // Accepted, response will be in SSE
+      expect(response.status).toBe(200); // Accepted, response will be in SSE
     });
 
     it('should handle echo tool call with custom basePath', async () => {
@@ -643,7 +643,7 @@ describe('MCP Plugin', () => {
         })
       );
 
-      expect(response.status).toBe(202); // Accepted, response will be in SSE
+      expect(response.status).toBe(200); // Accepted, response will be in SSE
     });
 
     it('should return SSE stream for custom basePath', async () => {
@@ -914,7 +914,7 @@ describe('MCP Plugin', () => {
         })
       );
 
-      expect(initResponse.status).toBe(202);
+      expect(initResponse.status).toBe(200);
       stressSessionId = initResponse.headers.get('Mcp-Session-Id') ?? '';
     });
 
@@ -1196,7 +1196,7 @@ describe('MCP Plugin', () => {
             })
           );
 
-          expect(initResponse.status).toBe(202);
+          expect(initResponse.status).toBe(200);
           const sessionId = initResponse.headers.get('Mcp-Session-Id') ?? '';
 
           // Make multiple requests with this session

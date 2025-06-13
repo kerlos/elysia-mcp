@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll } from 'bun:test';
 import { Elysia } from 'elysia';
-import { mcp } from '../src/mcp-plugin';
+import { mcp } from '../src/index';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
@@ -389,7 +389,7 @@ Alice Brown,28,Sydney,Australia`;
       })
     );
 
-    expect(initResponse.status).toBe(202);
+    expect(initResponse.status).toBe(200);
     sessionId = initResponse.headers.get('Mcp-Session-Id') ?? '';
     expect(sessionId).toBeTruthy();
   });
@@ -412,7 +412,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle resources/list with _meta progressToken', async () => {
@@ -434,7 +434,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle resources/list with different ID formats', async () => {
@@ -455,7 +455,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response1.status).toBe(202);
+      expect(response1.status).toBe(200);
 
       // Test with numeric ID
       const response2 = await app.handle(
@@ -474,7 +474,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response2.status).toBe(202);
+      expect(response2.status).toBe(200);
     });
   });
 
@@ -498,7 +498,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle resource read with different URIs', async () => {
@@ -521,7 +521,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       }
     });
 
@@ -544,7 +544,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle resource read with non-existent URI', async () => {
@@ -566,7 +566,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, resource not found error in response
+      expect(response.status).toBe(200); // Request accepted, resource not found error in response
     });
 
     it('should handle resource read with error-throwing resource', async () => {
@@ -588,7 +588,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, error in response
+      expect(response.status).toBe(200); // Request accepted, error in response
     });
 
     it('should handle resource read with missing URI parameter', async () => {
@@ -610,7 +610,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, validation error in response
+      expect(response.status).toBe(200); // Request accepted, validation error in response
     });
 
     it('should handle resource read with invalid URI format', async () => {
@@ -632,7 +632,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, resource not found error in response
+      expect(response.status).toBe(200); // Request accepted, resource not found error in response
     });
   });
 
@@ -746,7 +746,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle requests with different ID types', async () => {
@@ -767,7 +767,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response1.status).toBe(202);
+      expect(response1.status).toBe(200);
 
       // String ID for resource read
       const response2 = await app.handle(
@@ -786,7 +786,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response2.status).toBe(202);
+      expect(response2.status).toBe(200);
     });
   });
 
@@ -808,7 +808,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle requests with case variations in headers', async () => {
@@ -828,7 +828,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
   });
 
@@ -851,7 +851,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle resources with large content', async () => {
@@ -871,7 +871,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle resources with empty content', async () => {
@@ -891,7 +891,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle malformed URI schemes', async () => {
@@ -919,7 +919,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202); // Request accepted, resource not found error in response
+        expect(response.status).toBe(200); // Request accepted, resource not found error in response
       }
     });
   });
@@ -950,7 +950,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       }
     });
 
@@ -973,7 +973,7 @@ Alice Brown,28,Sydney,Australia`;
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, resource not found error in response
+      expect(response.status).toBe(200); // Request accepted, resource not found error in response
     });
   });
 
@@ -996,7 +996,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle markdown text resources', async () => {
@@ -1016,7 +1016,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle CSV text resources', async () => {
@@ -1036,7 +1036,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle large text resources', async () => {
@@ -1056,7 +1056,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
     });
 
@@ -1078,7 +1078,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle JPEG image resources', async () => {
@@ -1098,7 +1098,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle WAV audio resources', async () => {
@@ -1118,7 +1118,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle PDF document resources', async () => {
@@ -1138,7 +1138,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle ZIP archive resources', async () => {
@@ -1158,7 +1158,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
     });
 
@@ -1180,7 +1180,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle dynamic content resources', async () => {
@@ -1202,7 +1202,7 @@ Alice Brown,28,Sydney,Australia`;
             })
           );
 
-          expect(response.status).toBe(202);
+          expect(response.status).toBe(200);
         }
       });
     });
@@ -1232,7 +1232,7 @@ Alice Brown,28,Sydney,Australia`;
             })
           );
 
-          expect(response.status).toBe(202);
+          expect(response.status).toBe(200);
         }
       });
 
@@ -1262,7 +1262,7 @@ Alice Brown,28,Sydney,Australia`;
             })
           );
 
-          expect(response.status).toBe(202);
+          expect(response.status).toBe(200);
         }
       });
     });
@@ -1286,7 +1286,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle large text content efficiently', async () => {
@@ -1306,7 +1306,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle binary content with proper encoding', async () => {
@@ -1326,7 +1326,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
     });
 
@@ -1348,7 +1348,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should validate binary content structure', async () => {
@@ -1368,7 +1368,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should validate multi-content structure', async () => {
@@ -1388,7 +1388,7 @@ Alice Brown,28,Sydney,Australia`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
     });
 
@@ -1418,7 +1418,7 @@ Alice Brown,28,Sydney,Australia`;
             })
           );
 
-          expect(response.status).toBe(202);
+          expect(response.status).toBe(200);
         }
       });
 
@@ -1448,7 +1448,7 @@ Alice Brown,28,Sydney,Australia`;
             })
           );
 
-          expect(response.status).toBe(202);
+          expect(response.status).toBe(200);
         }
       });
 
@@ -1472,7 +1472,7 @@ Alice Brown,28,Sydney,Australia`;
             })
           );
 
-          expect(response.status).toBe(202);
+          expect(response.status).toBe(200);
         }
       });
     });

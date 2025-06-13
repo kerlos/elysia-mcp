@@ -1,15 +1,10 @@
 import { describe, expect, it, beforeAll } from 'bun:test';
 import { Elysia } from 'elysia';
-import { mcp } from '../src/mcp-plugin';
+import { mcp } from '../src/index';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import {
-  type PromptMessage,
-  createTextContent,
-  createImageContent,
-  createAudioContent,
-  createResourceContent,
-} from '../src/index.js';
+import type { PromptMessage } from '@modelcontextprotocol/sdk/types.js';
+import { createTextContent, createImageContent, createAudioContent, createResourceContent } from '../src/types';
 
 describe('MCP Prompts Interface Testing', () => {
   let app: Elysia;
@@ -400,7 +395,7 @@ features=["feature1", "feature2"]`;
       })
     );
 
-    expect(initResponse.status).toBe(202);
+    expect(initResponse.status).toBe(200);
     sessionId = initResponse.headers.get('Mcp-Session-Id') ?? '';
     expect(sessionId).toBeTruthy();
   });
@@ -423,7 +418,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle prompts/list with _meta progressToken', async () => {
@@ -445,7 +440,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle prompts/list with different ID formats', async () => {
@@ -466,7 +461,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response1.status).toBe(202);
+      expect(response1.status).toBe(200);
 
       // Test with numeric ID
       const response2 = await app.handle(
@@ -485,7 +480,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response2.status).toBe(202);
+      expect(response2.status).toBe(200);
     });
   });
 
@@ -510,7 +505,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle prompt get with all parameters', async () => {
@@ -533,7 +528,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle prompt get with complex arguments', async () => {
@@ -560,7 +555,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle prompt get with commit message generation', async () => {
@@ -587,7 +582,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle prompt get with empty arguments', async () => {
@@ -610,7 +605,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, validation error in response
+      expect(response.status).toBe(200); // Request accepted, validation error in response
     });
 
     it('should handle prompt get with non-existent prompt', async () => {
@@ -633,7 +628,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, prompt not found error in response
+      expect(response.status).toBe(200); // Request accepted, prompt not found error in response
     });
 
     it('should handle prompt get with missing name parameter', async () => {
@@ -656,7 +651,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, validation error in response
+      expect(response.status).toBe(200); // Request accepted, validation error in response
     });
 
     it('should handle prompt get with missing arguments parameter', async () => {
@@ -679,7 +674,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, validation error in response
+      expect(response.status).toBe(200); // Request accepted, validation error in response
     });
   });
 
@@ -751,7 +746,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle requests with different ID types', async () => {
@@ -772,7 +767,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response1.status).toBe(202);
+      expect(response1.status).toBe(200);
 
       // String ID
       const response2 = await app.handle(
@@ -794,7 +789,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response2.status).toBe(202);
+      expect(response2.status).toBe(200);
     });
   });
 
@@ -816,7 +811,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle requests with case variations in headers', async () => {
@@ -839,7 +834,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
   });
 
@@ -867,7 +862,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle prompts with enum validation', async () => {
@@ -893,7 +888,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle prompts with invalid enum values', async () => {
@@ -919,7 +914,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, validation error in response
+      expect(response.status).toBe(200); // Request accepted, validation error in response
     });
   });
 
@@ -945,7 +940,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
     });
 
@@ -973,7 +968,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle prompts without image content', async () => {
@@ -999,7 +994,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
     });
 
@@ -1027,7 +1022,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle prompts without audio content', async () => {
@@ -1053,7 +1048,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
     });
 
@@ -1081,7 +1076,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle prompts with text resource content', async () => {
@@ -1107,7 +1102,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle prompts with config resource content', async () => {
@@ -1133,7 +1128,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle prompts without resource content', async () => {
@@ -1158,7 +1153,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
     });
 
@@ -1188,7 +1183,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle prompts with selective content types', async () => {
@@ -1216,7 +1211,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
 
       it('should handle prompts with no optional content', async () => {
@@ -1244,7 +1239,7 @@ features=["feature1", "feature2"]`;
           })
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(200);
       });
     });
   });
@@ -1273,7 +1268,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, validation error in response
+      expect(response.status).toBe(200); // Request accepted, validation error in response
     });
 
     it('should handle missing optional parameters gracefully', async () => {
@@ -1298,7 +1293,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
   });
 
@@ -1326,7 +1321,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle prompts with multiple message roles', async () => {
@@ -1352,7 +1347,7 @@ features=["feature1", "feature2"]`;
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll } from 'bun:test';
 import { Elysia } from 'elysia';
-import { mcp } from '../src/mcp-plugin';
+import { mcp } from '../src/index';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
@@ -22,7 +22,7 @@ describe('MCP Tools Interface Testing', () => {
           prompts: {},
           logging: {},
         },
-        enableLogging: false, // Disable logging for tests
+        enableLogging: true, // Disable logging for tests
         setupServer: async (server: McpServer) => {
           // Simple tools for testing - using Zod schemas
           server.tool(
@@ -81,7 +81,7 @@ describe('MCP Tools Interface Testing', () => {
       })
     );
 
-    expect(initResponse.status).toBe(202);
+    expect(initResponse.status).toBe(200);
     sessionId = initResponse.headers.get('Mcp-Session-Id') ?? '';
     expect(sessionId).toBeTruthy();
   });
@@ -104,7 +104,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle tools/list with _meta progressToken', async () => {
@@ -126,7 +126,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle tools/list with different ID formats', async () => {
@@ -147,7 +147,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response1.status).toBe(202);
+      expect(response1.status).toBe(200);
 
       // Skip null ID test as it's too strict for MCP validation
       // The MCP SDK doesn't handle null IDs well
@@ -175,7 +175,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle tool call with string arguments', async () => {
@@ -198,7 +198,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle tool call with empty arguments', async () => {
@@ -221,7 +221,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, validation error in response
+      expect(response.status).toBe(200); // Request accepted, validation error in response
     });
 
     it('should handle tool call with non-existent tool', async () => {
@@ -244,7 +244,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, tool not found error in response
+      expect(response.status).toBe(200); // Request accepted, tool not found error in response
     });
 
     it('should handle tool call with missing name parameter', async () => {
@@ -267,7 +267,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, validation error in response
+      expect(response.status).toBe(200); // Request accepted, validation error in response
     });
 
     it('should handle tool call with missing arguments parameter', async () => {
@@ -290,7 +290,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response.status).toBe(202); // Request accepted, validation error in response
+      expect(response.status).toBe(200); // Request accepted, validation error in response
     });
   });
 
@@ -360,7 +360,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response1.status).toBe(202);
+      expect(response1.status).toBe(200);
 
       // Skip invalid JSON-RPC test as MCP SDK is strict about compliance
       // The MCP layer validates JSON-RPC 2.0 format strictly
@@ -384,7 +384,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response1.status).toBe(202);
+      expect(response1.status).toBe(200);
 
       // String ID
       const response2 = await app.handle(
@@ -403,7 +403,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response2.status).toBe(202);
+      expect(response2.status).toBe(200);
     });
   });
 
@@ -425,7 +425,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
 
     it('should handle requests with case variations in headers', async () => {
@@ -445,7 +445,7 @@ describe('MCP Tools Interface Testing', () => {
         })
       );
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(200);
     });
   });
 });

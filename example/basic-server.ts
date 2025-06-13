@@ -2,13 +2,10 @@ import { Elysia } from 'elysia';
 import { z } from 'zod';
 import {
   mcp,
-  type McpServer,
-  type PromptMessage,
-  createImageContent,
-  createAudioContent,
-  createResourceContent,
-  createTextContent,
 } from '../src/index.js';
+import type { PromptMessage } from '@modelcontextprotocol/sdk/types.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { createTextContent, createResourceContent, createImageContent, createAudioContent } from '../src/types.js';
 
 // Example service class
 class ExampleService {
