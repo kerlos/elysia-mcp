@@ -89,13 +89,20 @@ export class ElysiaStreamingHttpTransport implements Transport {
   }
 
   // Generator function for Elysia streaming
-  async *stream() {
+  async *stream(): AsyncGenerator<string, void, unknown> {
     while (this._started) {
       if (this._messageQueue.length > 0) {
-        const message = this._messageQueue.shift();
-        if (message) {
-          yield message;
+        const messagesToSend: string[] = [];
+        do {
+          const message = this._messageQueue.shift();
+          if (message) {
+            messagesToSend.push(message);
+          }
+        } while (this._messageQueue.length > 0);
+        if (messagesToSend.length === 1) {
+          yield JSON.stringify(messagesToSend[0]);
         }
+        yield JSON.stringify(messagesToSend);
       }
       // Small delay to prevent tight loop
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -564,13 +571,14 @@ export class ElysiaStreamingHttpTransport implements Transport {
         .filter(([_, sid]) => this._streamMapping.get(sid) === stream)
         .map(([id]) => id);
 
+      this.logger.log('relatedIds', relatedIds);
       const allResponsesReady = relatedIds.every((id) =>
         this._requestResponseMap.has(id)
       );
 
       if (allResponsesReady) {
+        this.logger.log('allResponsesReady', relatedIds);
         if (this._enableJsonResponse) {
-          console.log('allResponsesReady', relatedIds);
           // All responses ready, send as JSON
           const headers: Record<string, string> = {
             'content-type': 'application/json',
