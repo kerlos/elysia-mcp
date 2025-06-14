@@ -240,6 +240,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
       }
       const authInfo = context.store.authInfo;
       const rawMessage = body;
+
       const messages: JSONRPCMessage[] = Array.isArray(rawMessage)
         ? rawMessage.map((msg) => JSONRPCMessageSchema.parse(msg))
         : [JSONRPCMessageSchema.parse(rawMessage)];
@@ -369,7 +370,8 @@ export class ElysiaStreamingHttpTransport implements Transport {
         jsonrpc: '2.0',
         error: {
           code: -32700,
-          message: String(error),
+          message: 'Parse error',
+          data: String(error),
         },
         id: null,
       };
@@ -571,13 +573,11 @@ export class ElysiaStreamingHttpTransport implements Transport {
         .filter(([_, sid]) => this._streamMapping.get(sid) === stream)
         .map(([id]) => id);
 
-      this.logger.log('relatedIds', relatedIds);
       const allResponsesReady = relatedIds.every((id) =>
         this._requestResponseMap.has(id)
       );
 
       if (allResponsesReady) {
-        this.logger.log('allResponsesReady', relatedIds);
         if (this._enableJsonResponse) {
           // All responses ready, send as JSON
           const headers: Record<string, string> = {

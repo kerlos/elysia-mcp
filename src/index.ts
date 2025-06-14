@@ -137,6 +137,23 @@ export const mcp = (options: MCPPluginOptions = {}) => {
   const app = new Elysia({ name: `mcp-${serverInfo.name}` })
     .state('authInfo', undefined as AuthInfo | undefined)
     .onBeforeHandle(async (context) => {
+      if (context.request.method === 'POST') {
+        try {
+          const clonedRequest = context.request.clone();
+          await clonedRequest.json();
+        } catch (error) {
+          context.set.status = 400;
+          return {
+            jsonrpc: '2.0',
+            error: {
+              code: -32700,
+              message: 'Parse error',
+              data: String(error),
+            },
+            id: null,
+          };
+        }
+      }
       const protocolVersion = context.request.headers.get(
         'mcp-protocol-version'
       );
