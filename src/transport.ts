@@ -4,18 +4,19 @@ import {
   isJSONRPCError,
   isJSONRPCRequest,
   isJSONRPCResponse,
+  JSONRPCMessageSchema,
   SUPPORTED_PROTOCOL_VERSIONS,
   type JSONRPCMessage,
   type RequestId,
-} from "@modelcontextprotocol/sdk/types.js";
-import { Logger } from "./utils/logger";
-import type { Context } from "elysia";
+} from '@modelcontextprotocol/sdk/types.js';
+import { Logger } from './utils/logger';
+import type { Context } from 'elysia';
 import type {
   JSONRPCError,
   McpContext,
   StreamableHTTPServerTransportOptions,
-} from "./types";
-import type { EventStore } from "./types";
+} from './types';
+import type { EventStore } from './types';
 
 /**
  * Configuration options for StreamableHTTPServerTransport
@@ -233,8 +234,8 @@ export class ElysiaStreamingHttpTransport implements Transport {
       const authInfo = context.store.authInfo;
       const rawMessage = body;
       const messages: JSONRPCMessage[] = Array.isArray(rawMessage)
-        ? rawMessage
-        : [rawMessage];
+        ? rawMessage.map((msg) => JSONRPCMessageSchema.parse(msg))
+        : [JSONRPCMessageSchema.parse(rawMessage)];
 
       const isInitializationRequest = messages.some(isInitializeRequest);
       if (isInitializationRequest) {
@@ -469,7 +470,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
     const protocolVersion = request.headers.get('mcp-protocol-version');
 
-    if (protocolVersion && !SUPPORTED_PROTOCOL_VERSIONS.includes(protocolVersion)) {
+    if (
+      protocolVersion &&
+      !SUPPORTED_PROTOCOL_VERSIONS.includes(protocolVersion)
+    ) {
       return {
         valid: false,
         status: 400,
@@ -566,6 +570,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
       if (allResponsesReady) {
         if (this._enableJsonResponse) {
+          console.log('allResponsesReady', relatedIds);
           // All responses ready, send as JSON
           const headers: Record<string, string> = {
             'content-type': 'application/json',
