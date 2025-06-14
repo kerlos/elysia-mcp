@@ -1,4 +1,5 @@
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types";
+
 import type {
   JSONRPCError as JSONRPCErrorRaw,
   JSONRPCMessage,

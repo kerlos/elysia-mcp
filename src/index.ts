@@ -2,12 +2,13 @@ import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   isInitializeRequest,
-  type ServerCapabilities
-} from "@modelcontextprotocol/sdk/types.js";
-import { Elysia } from "elysia";
-import { ElysiaStreamingHttpTransport } from "./transport";
-import type { McpContext } from "./types";
-import { Logger } from "./utils/logger";
+  SUPPORTED_PROTOCOL_VERSIONS,
+  type ServerCapabilities,
+} from '@modelcontextprotocol/sdk/types.js';
+import { Elysia } from 'elysia';
+import { ElysiaStreamingHttpTransport } from './transport';
+import type { McpContext } from './types';
+import { Logger } from './utils/logger';
 
 // Plugin options
 export interface MCPPluginOptions {
@@ -31,8 +32,8 @@ export const transports: Record<string, ElysiaStreamingHttpTransport> = {};
 export const mcp = (options: MCPPluginOptions = {}) => {
   // Create MCP server singleton
   const serverInfo = options.serverInfo || {
-    name: "elysia-mcp-server",
-    version: "1.0.0",
+    name: 'elysia-mcp-server',
+    version: '1.0.0',
   };
 
   const server =
@@ -48,7 +49,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
     }
   })();
 
-  const basePath = options.basePath || "/mcp";
+  const basePath = options.basePath || '/mcp';
   const enableLogging = options.enableLogging ?? false;
   const logger = new Logger(enableLogging);
 
@@ -58,13 +59,21 @@ export const mcp = (options: MCPPluginOptions = {}) => {
     await setupPromise;
 
     logger.log(
-      `${request.method} ${request.url} ${body ? JSON.stringify(body) : ""}`
+      `${request.method} ${request.url} ${body ? JSON.stringify(body) : ''}`
     );
 
     try {
-      const sessionId = request.headers.get("mcp-session-id");
-      if (sessionId && transports[sessionId]) {
-        return await transports[sessionId].handleRequest(context);
+      const sessionId = request.headers.get('mcp-session-id');
+      if (sessionId) {
+        const transport = transports[sessionId];
+        if (!transport) {
+          set.status = 404;
+          return {
+            jsonrpc: '2.0',
+            error: { code: -32001, message: 'Session not found' },
+          };
+        }
+        return await transport.handleRequest(context);
       }
 
       if (!sessionId && isInitializeRequest(body)) {
@@ -90,21 +99,21 @@ export const mcp = (options: MCPPluginOptions = {}) => {
       // Invalid request
       set.status = 400;
       return {
-        jsonrpc: "2.0",
+        jsonrpc: '2.0',
         error: {
           code: -32000,
-          message: "Bad Request: No valid session ID provided",
+          message: 'Bad Request: No valid session ID provided',
         },
         id: null,
       };
     } catch (error) {
       set.status = 500;
-      logger.error("Error handling MCP request", JSON.stringify(error));
+      logger.error('Error handling MCP request', JSON.stringify(error));
       return {
-        jsonrpc: "2.0",
+        jsonrpc: '2.0',
         error: {
           code: -32000,
-          message: "Internal error",
+          message: 'Internal error',
         },
         id: null,
       };
@@ -112,20 +121,31 @@ export const mcp = (options: MCPPluginOptions = {}) => {
   };
 
   const app = new Elysia({ name: `mcp-${serverInfo.name}` })
-    .state("authInfo", undefined as AuthInfo | undefined)
+    .state('authInfo', undefined as AuthInfo | undefined)
     .onBeforeHandle(async (context) => {
       const protocolVersion = context.request.headers.get(
-        "mcp-protocol-version"
+        'mcp-protocol-version'
       );
-      if (protocolVersion && protocolVersion !== "2025-03-26") {
-        context.set.status = 400;
-        return {
-          jsonrpc: "2.0",
-          error: {
-            code: -32000,
-            message: "Bad Request: Unsupported protocol version",
-          },
-        };
+      if (protocolVersion) {
+        console.log(
+          `Protocol version: ${protocolVersion} (supported versions: ${SUPPORTED_PROTOCOL_VERSIONS.join(
+            ', '
+          )})`
+        );
+        if (!SUPPORTED_PROTOCOL_VERSIONS.includes(protocolVersion)) {
+          console.log('Unsupported protocol version', protocolVersion);
+          context.set.status = 400;
+          return {
+            jsonrpc: '2.0',
+            error: {
+              code: -32000,
+              message: `Bad Request: Unsupported protocol version (supported versions: ${SUPPORTED_PROTOCOL_VERSIONS.join(
+                ', '
+              )})`,
+            },
+            id: null,
+          };
+        }
       }
       if (options.authentication) {
         const { authInfo, response } = await options.authentication(context);
@@ -137,7 +157,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
           return response;
         }
         throw new Error(
-          "Invalid authentication, no authInfo or response provided"
+          'Invalid authentication, no authInfo or response provided'
         );
       }
     })

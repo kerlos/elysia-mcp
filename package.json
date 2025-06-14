@@ -22,7 +22,8 @@
     "prepublishOnly": "bun run build",
     "lint": "bunx biome lint ./src",
     "lint:fix": "bunx biome lint --write ./src",
-    "test": "bun test"
+    "test": "bun test",
+    "test:bail": "bun test --bail"
   },
   "keywords": [
     "elysia",
