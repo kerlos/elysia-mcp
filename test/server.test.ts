@@ -63,6 +63,7 @@ async function createTestServer(
     mcp({
       mcpServer,
       basePath: '/mcp',
+      enableLogging: true,
       serverInfo: {
         name: 'test-server',
         version: '1.0.0',

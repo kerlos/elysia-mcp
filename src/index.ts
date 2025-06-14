@@ -87,7 +87,10 @@ export const mcp = (options: MCPPluginOptions = {}) => {
         return await transport.handleRequest(context);
       }
 
-      if (!sessionId && isInitializeRequest(body)) {
+      const isInitialize =
+        (Array.isArray(body) && body.some(isInitializeRequest)) ||
+        isInitializeRequest(body);
+      if (!sessionId && isInitialize) {
         const transport = new ElysiaStreamingHttpTransport({
           sessionIdGenerator: () => Bun.randomUUIDv7(),
           onsessioninitialized: (sessionId) => {
@@ -165,6 +168,9 @@ export const mcp = (options: MCPPluginOptions = {}) => {
           'Invalid authentication, no authInfo or response provided'
         );
       }
+    })
+    .onAfterResponse(({ response }) => {
+      logger.log('response', JSON.stringify(response));
     })
     .all(`${basePath}/*`, mcpHandler)
     .all(basePath, mcpHandler);

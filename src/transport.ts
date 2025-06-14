@@ -200,30 +200,21 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
     try {
       const acceptHeader = headers['accept'];
-      if (this._enableJsonResponse) {
-        if (!acceptHeader?.includes('application/json')) {
-          set.status = 406;
-          return {
-            jsonrpc: '2.0',
-            error: {
-              code: -32000,
-              message: 'Not Acceptable: Client must accept application/json',
-            },
-            id: null,
-          };
-        }
-      } else {
-        if (!acceptHeader?.includes('text/event-stream')) {
-          set.status = 406;
-          return {
-            jsonrpc: '2.0',
-            error: {
-              code: -32000,
-              message: 'Not Acceptable: Client must accept text/event-stream',
-            },
-            id: null,
-          };
-        }
+
+      if (
+        !acceptHeader?.includes('text/event-stream') ||
+        !acceptHeader?.includes('application/json')
+      ) {
+        set.status = 406;
+        return {
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message:
+              'Not Acceptable: Client must accept both application/json and text/event-stream',
+          },
+          id: null,
+        };
       }
 
       const ct = request.headers.get('content-type');
@@ -244,21 +235,6 @@ export class ElysiaStreamingHttpTransport implements Transport {
       const messages: JSONRPCMessage[] = Array.isArray(rawMessage)
         ? rawMessage
         : [rawMessage];
-
-      const hasInvalidMessages = messages.some(
-        (message) => !isJSONRPCRequest(message)
-      );
-      if (hasInvalidMessages) {
-        set.status = 400;
-        return {
-          jsonrpc: '2.0',
-          error: {
-            code: -32600,
-            message: 'Invalid Request: Invalid message',
-          },
-          id: null,
-        };
-      }
 
       const isInitializationRequest = messages.some(isInitializeRequest);
       if (isInitializationRequest) {
@@ -300,6 +276,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
       const hasRequests = messages.some(isJSONRPCRequest);
       if (!hasRequests) {
+        // if it only contains notifications or responses, return 202
         set.status = 202;
         for (const message of messages) {
           this.logMessage(message);
