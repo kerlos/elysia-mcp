@@ -268,7 +268,11 @@ describe('ElysiaStreamingHttpTransport', () => {
       id: 'second-init',
     };
 
-    const response = await sendPostRequest(server, secondInitMessage);
+    const response = await sendPostRequest(
+      server,
+      secondInitMessage,
+      sessionId
+    );
 
     expect(response.status).toBe(400);
     const errorData = await response.json();
@@ -938,8 +942,6 @@ describe('ElysiaStreamingHttpTransport', () => {
           body: JSON.stringify(TEST_MESSAGES.toolsList),
         })
       );
-      console.log(await response.json());
-
       // Request should still succeed
       expect(response.status).toBe(200);
 

@@ -65,6 +65,17 @@ export const mcp = (options: MCPPluginOptions = {}) => {
     try {
       const sessionId = request.headers.get('mcp-session-id');
       if (sessionId) {
+        if (isInitializeRequest(body)) {
+          set.status = 400;
+          return {
+            jsonrpc: '2.0',
+            error: {
+              code: -32600,
+              message: 'Invalid Request: Server already initialized',
+            },
+            id: null,
+          };
+        }
         const transport = transports[sessionId];
         if (!transport) {
           set.status = 404;
@@ -127,13 +138,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
         'mcp-protocol-version'
       );
       if (protocolVersion) {
-        console.log(
-          `Protocol version: ${protocolVersion} (supported versions: ${SUPPORTED_PROTOCOL_VERSIONS.join(
-            ', '
-          )})`
-        );
         if (!SUPPORTED_PROTOCOL_VERSIONS.includes(protocolVersion)) {
-          console.log('Unsupported protocol version', protocolVersion);
           context.set.status = 400;
           return {
             jsonrpc: '2.0',

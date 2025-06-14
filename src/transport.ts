@@ -164,9 +164,9 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
 
     set.headers = {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache, no-transform',
+      connection: 'keep-alive',
     };
 
     if (this.sessionId !== undefined) {
@@ -313,7 +313,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
       if (this._enableJsonResponse) {
         // Set headers for JSON response
         set.headers = {
-          'Content-Type': 'application/json',
+          'content-type': 'application/json',
         };
         if (this.sessionId !== undefined) {
           set.headers['mcp-session-id'] = this.sessionId;
@@ -341,9 +341,9 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
       // Else (if _enableJsonResponse is false), handle as SSE stream
       set.headers = {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache',
+        connection: 'keep-alive',
       };
       if (this.sessionId !== undefined) {
         set.headers['mcp-session-id'] = this.sessionId;
@@ -591,7 +591,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
         if (this._enableJsonResponse) {
           // All responses ready, send as JSON
           const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
+            'content-type': 'application/json',
           };
           if (this.sessionId !== undefined) {
             headers['mcp-session-id'] = this.sessionId;
@@ -655,14 +655,15 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
 
     try {
-      context.set.headers = {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        Connection: 'keep-alive',
+      const setHeaders: Record<string, string> = {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache, no-transform',
+        connection: 'keep-alive',
       };
       if (this.sessionId !== undefined) {
-        context.set.headers['mcp-session-id'] = this.sessionId;
+        setHeaders['mcp-session-id'] = this.sessionId;
       }
+      context.set.headers = setHeaders;
       context.set.status = 200;
 
       const stream = this.stream();
