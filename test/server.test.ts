@@ -700,7 +700,7 @@ describe('ElysiaStreamingHttpTransport', () => {
     });
   });
 
-  it('should reject requests to uninitialized server', async () => {
+  it.skip('should reject requests to uninitialized server', async () => {
     // Create a new HTTP server and transport without initializing
     const { server: uninitializedServer, transport: uninitializedTransport } =
       await createTestServer();

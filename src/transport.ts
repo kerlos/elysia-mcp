@@ -100,7 +100,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
           }
         } while (this._messageQueue.length > 0);
         if (messagesToSend.length === 1) {
-          yield JSON.stringify(messagesToSend[0]);
+          yield messagesToSend[0];
         }
         yield JSON.stringify(messagesToSend);
       }
