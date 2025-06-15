@@ -8,15 +8,15 @@ import {
   SUPPORTED_PROTOCOL_VERSIONS,
   type JSONRPCMessage,
   type RequestId,
-} from '@modelcontextprotocol/sdk/types.js';
-import { Logger } from './utils/logger';
-import type { Context } from 'elysia';
+} from "@modelcontextprotocol/sdk/types.js";
+import { Logger } from "./utils/logger";
+import type { Context } from "elysia";
 import type {
   JSONRPCError,
   McpContext,
   StreamableHTTPServerTransportOptions,
-} from './types';
-import type { EventStore } from './types';
+} from "./types";
+import type { EventStore } from "./types";
 
 /**
  * Configuration options for StreamableHTTPServerTransport
@@ -34,7 +34,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
   >();
   private _requestToStreamMapping = new Map<RequestId, string>();
   private _requestResponseMap = new Map<RequestId, JSONRPCMessage>();
-  private _standaloneSseStreamId = '_GET_stream';
+  private _standaloneSseStreamId = "_GET_stream";
   private logger: Logger;
 
   sessionId?: string;
@@ -60,7 +60,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
   async start(): Promise<void> {
     if (this._started) {
-      throw new Error('Transport already started');
+      throw new Error("Transport already started");
     }
     this._started = true;
     this.logger.log(`[Transport] Starting transport`);
@@ -101,8 +101,9 @@ export class ElysiaStreamingHttpTransport implements Transport {
         } while (this._messageQueue.length > 0);
         if (messagesToSend.length === 1) {
           yield messagesToSend[0];
+        } else {
+          messagesToSend;
         }
-        yield JSON.stringify(messagesToSend);
       }
       // Small delay to prevent tight loop
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -113,11 +114,11 @@ export class ElysiaStreamingHttpTransport implements Transport {
     const { request } = context;
     const method = request.method;
     switch (method) {
-      case 'GET':
+      case "GET":
         return this.handleGetRequest(context);
-      case 'POST':
+      case "POST":
         return this.handlePostRequest(context);
-      case 'DELETE':
+      case "DELETE":
         return this.handleDeleteRequest(context);
       default:
         return this.handleUnsupportedRequest(context);
@@ -126,14 +127,14 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
   protected async handleGetRequest(context: McpContext) {
     const { set, headers } = context;
-    const acceptHeader = headers['accept'];
-    if (!acceptHeader?.includes('text/event-stream')) {
+    const acceptHeader = headers["accept"];
+    if (!acceptHeader?.includes("text/event-stream")) {
       set.status = 406;
       return {
-        jsonrpc: '2.0',
+        jsonrpc: "2.0",
         error: {
           code: -32000,
-          message: 'Not Acceptable: Client must accept text/event-stream',
+          message: "Not Acceptable: Client must accept text/event-stream",
         },
         id: null,
       };
@@ -147,7 +148,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
     // Handle resumability: check for Last-Event-ID header
     if (this._eventStore) {
-      const lastEventId = headers['last-event-id'] as string | undefined;
+      const lastEventId = headers["last-event-id"] as string | undefined;
       if (lastEventId) {
         await this.replayEvents(lastEventId, context);
         return;
@@ -157,13 +158,13 @@ export class ElysiaStreamingHttpTransport implements Transport {
     const path = context.request.url;
     const url = new URL(path);
 
-    if (path.includes('/resources')) {
-      const resourcePath = url.searchParams.get('uri');
+    if (path.includes("/resources")) {
+      const resourcePath = url.searchParams.get("uri");
       if (resourcePath) {
         this.logger.log(`Direct resource access: ${resourcePath}`);
       }
-    } else if (path.includes('/prompts')) {
-      const promptName = url.searchParams.get('name');
+    } else if (path.includes("/prompts")) {
+      const promptName = url.searchParams.get("name");
       if (promptName) {
         this.logger.log(`Direct prompt access: ${promptName}`);
       } else {
@@ -172,22 +173,22 @@ export class ElysiaStreamingHttpTransport implements Transport {
     }
 
     set.headers = {
-      'content-type': 'text/event-stream',
-      'cache-control': 'no-cache, no-transform',
-      connection: 'keep-alive',
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
     };
 
     if (this.sessionId !== undefined) {
-      set.headers['mcp-session-id'] = this.sessionId;
+      set.headers["mcp-session-id"] = this.sessionId;
     }
 
     if (this._streamMapping.get(this._standaloneSseStreamId) !== undefined) {
       set.status = 409;
       return {
-        jsonrpc: '2.0',
+        jsonrpc: "2.0",
         error: {
           code: -32000,
-          message: 'Conflict: Only one SSE stream is allowed per session',
+          message: "Conflict: Only one SSE stream is allowed per session",
         },
         id: null,
       };
@@ -207,33 +208,33 @@ export class ElysiaStreamingHttpTransport implements Transport {
     const { request, set, headers, body } = context;
 
     try {
-      const acceptHeader = headers['accept'];
+      const acceptHeader = headers["accept"];
 
       if (
-        !acceptHeader?.includes('text/event-stream') ||
-        !acceptHeader?.includes('application/json')
+        !acceptHeader?.includes("text/event-stream") ||
+        !acceptHeader?.includes("application/json")
       ) {
         set.status = 406;
         return {
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           error: {
             code: -32000,
             message:
-              'Not Acceptable: Client must accept both application/json and text/event-stream',
+              "Not Acceptable: Client must accept both application/json and text/event-stream",
           },
           id: null,
         };
       }
 
-      const ct = request.headers.get('content-type');
-      if (!ct || !ct.includes('application/json')) {
+      const ct = request.headers.get("content-type");
+      if (!ct || !ct.includes("application/json")) {
         set.status = 415;
         return {
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           error: {
             code: -32000,
             message:
-              'Unsupported Media Type: Content-Type must be application/json',
+              "Unsupported Media Type: Content-Type must be application/json",
           },
           id: null,
         };
@@ -250,10 +251,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
         if (this._initialized && this.sessionId !== undefined) {
           set.status = 400;
           return {
-            jsonrpc: '2.0',
+            jsonrpc: "2.0",
             error: {
               code: -32600,
-              message: 'Invalid Request: Server already initialized',
+              message: "Invalid Request: Server already initialized",
             },
             id: null,
           };
@@ -261,11 +262,11 @@ export class ElysiaStreamingHttpTransport implements Transport {
         if (messages.length > 1) {
           set.status = 400;
           return {
-            jsonrpc: '2.0',
+            jsonrpc: "2.0",
             error: {
               code: -32600,
               message:
-                'Invalid Request: Only one initialization request is allowed',
+                "Invalid Request: Only one initialization request is allowed",
             },
             id: null,
           };
@@ -299,10 +300,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
       if (this._enableJsonResponse) {
         // Set headers for JSON response
         set.headers = {
-          'content-type': 'application/json',
+          "content-type": "application/json",
         };
         if (this.sessionId !== undefined) {
-          set.headers['mcp-session-id'] = this.sessionId;
+          set.headers["mcp-session-id"] = this.sessionId;
         }
         set.status = 200;
 
@@ -327,12 +328,12 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
       // Else (if _enableJsonResponse is false), handle as SSE stream
       set.headers = {
-        'content-type': 'text/event-stream',
-        'cache-control': 'no-cache',
-        connection: 'keep-alive',
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+        connection: "keep-alive",
       };
       if (this.sessionId !== undefined) {
-        set.headers['mcp-session-id'] = this.sessionId;
+        set.headers["mcp-session-id"] = this.sessionId;
       }
       set.status = 200;
 
@@ -351,10 +352,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
         const currentStream = this._streamMapping.get(streamId)?.stream;
         if (this._started && currentStream) {
           this.writeSSEEvent(currentStream, {
-            jsonrpc: '2.0',
-            method: 'ping',
+            jsonrpc: "2.0",
+            method: "ping",
             params: {},
-            id: 'ping',
+            id: "ping",
           });
         }
       }, 30000);
@@ -365,12 +366,12 @@ export class ElysiaStreamingHttpTransport implements Transport {
     } catch (error) {
       set.status = 400;
       this.onerror?.(error instanceof Error ? error : new Error(String(error)));
-      this.logger.error('Error handling MCP request', JSON.stringify(error));
+      this.logger.error("Error handling MCP request", JSON.stringify(error));
       return {
-        jsonrpc: '2.0',
+        jsonrpc: "2.0",
         error: {
           code: -32700,
-          message: 'Parse error',
+          message: "Parse error",
           data: String(error),
         },
         id: null,
@@ -394,13 +395,13 @@ export class ElysiaStreamingHttpTransport implements Transport {
   }: Context): Promise<JSONRPCError> {
     set.status = 405;
     set.headers = {
-      Allow: 'GET, POST, DELETE',
+      Allow: "GET, POST, DELETE",
     };
     return {
-      jsonrpc: '2.0',
+      jsonrpc: "2.0",
       error: {
         code: -32000,
-        message: 'Method not allowed.',
+        message: "Method not allowed.",
       },
       id: null,
     };
@@ -419,27 +420,27 @@ export class ElysiaStreamingHttpTransport implements Transport {
         valid: false,
         status: 400,
         response: {
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           error: {
             code: -32000,
-            message: 'Bad Request: Server not initialized',
+            message: "Bad Request: Server not initialized",
           },
           id: null,
         },
       };
     }
 
-    const sessionId = request.headers.get('mcp-session-id');
+    const sessionId = request.headers.get("mcp-session-id");
 
     if (!sessionId) {
       return {
         valid: false,
         status: 400,
         response: {
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           error: {
             code: -32000,
-            message: 'Bad Request: Mcp-Session-Id header is required',
+            message: "Bad Request: Mcp-Session-Id header is required",
           },
           id: null,
         },
@@ -451,11 +452,11 @@ export class ElysiaStreamingHttpTransport implements Transport {
         valid: false,
         status: 400,
         response: {
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           error: {
             code: -32000,
             message:
-              'Bad Request: Mcp-Session-Id header must be a single value',
+              "Bad Request: Mcp-Session-Id header must be a single value",
           },
           id: null,
         },
@@ -467,17 +468,17 @@ export class ElysiaStreamingHttpTransport implements Transport {
         valid: false,
         status: 404,
         response: {
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           error: {
             code: -32001,
-            message: 'Session not found',
+            message: "Session not found",
           },
           id: null,
         },
       };
     }
 
-    const protocolVersion = request.headers.get('mcp-protocol-version');
+    const protocolVersion = request.headers.get("mcp-protocol-version");
 
     if (
       protocolVersion &&
@@ -487,10 +488,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
         valid: false,
         status: 400,
         response: {
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           error: {
             code: -32000,
-            message: 'Bad Request: Unsupported protocol version',
+            message: "Bad Request: Unsupported protocol version",
           },
           id: null,
         },
@@ -522,7 +523,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
     if (requestId === undefined) {
       if (isJSONRPCResponse(message) || isJSONRPCError(message)) {
-        throw new Error('Cannot send a response on a standalone SSE stream');
+        throw new Error("Cannot send a response on a standalone SSE stream");
       }
       const standaloneSse = this._streamMapping.get(
         this._standaloneSseStreamId
@@ -581,10 +582,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
         if (this._enableJsonResponse) {
           // All responses ready, send as JSON
           const headers: Record<string, string> = {
-            'content-type': 'application/json',
+            "content-type": "application/json",
           };
           if (this.sessionId !== undefined) {
-            headers['mcp-session-id'] = this.sessionId;
+            headers["mcp-session-id"] = this.sessionId;
           }
 
           const responses = relatedIds
@@ -646,12 +647,12 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
     try {
       const setHeaders: Record<string, string> = {
-        'content-type': 'text/event-stream',
-        'cache-control': 'no-cache, no-transform',
-        connection: 'keep-alive',
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache, no-transform",
+        connection: "keep-alive",
       };
       if (this.sessionId !== undefined) {
-        setHeaders['mcp-session-id'] = this.sessionId;
+        setHeaders["mcp-session-id"] = this.sessionId;
       }
       context.set.headers = setHeaders;
       context.set.status = 200;
@@ -660,7 +661,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
       const streamId = await this._eventStore.replayEventsAfter(lastEventId, {
         send: async (eventId: string, message: JSONRPCMessage) => {
           if (!this.writeSSEEvent(stream, message, eventId)) {
-            this.onerror?.(new Error('Failed to replay events'));
+            this.onerror?.(new Error("Failed to replay events"));
             return;
           }
         },
@@ -674,10 +675,10 @@ export class ElysiaStreamingHttpTransport implements Transport {
   }
 
   private logMessage(message: JSONRPCMessage) {
-    if ('method' in message) {
+    if ("method" in message) {
       this.logger.log(
         `method: ${message.method} ${
-          message.params ? 'params: ' + JSON.stringify(message.params) : ''
+          message.params ? "params: " + JSON.stringify(message.params) : ""
         }`
       );
     }
