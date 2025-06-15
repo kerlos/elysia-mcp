@@ -664,6 +664,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
       const stream = this.stream();
       const streamId = await this._eventStore.replayEventsAfter(lastEventId, {
         send: async (eventId: string, message: JSONRPCMessage) => {
+          //this.logger.debug('send replay event', eventId, JSON.stringify(message));
           if (!this.writeSSEEvent(stream, message, eventId)) {
             this.onerror?.(new Error('Failed to replay events'));
             return;

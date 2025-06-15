@@ -8,7 +8,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { Elysia } from 'elysia';
 import { ElysiaStreamingHttpTransport } from './transport';
-import type { McpContext } from './types';
+import type { EventStore, McpContext } from './types';
 import { Logger } from './utils/logger';
 // Plugin options
 export interface MCPPluginOptions {
@@ -26,6 +26,7 @@ export interface MCPPluginOptions {
   setupServer?: (server: McpServer) => void | Promise<void>;
   stateless?: boolean;
   mcpServer?: McpServer;
+  eventStore?: EventStore;
 }
 
 export const transports: Record<string, ElysiaStreamingHttpTransport> = {};
@@ -122,6 +123,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
           onsessioninitialized: (sessionId) => {
             transports[sessionId] = transport;
           },
+          eventStore: options.eventStore,
           enableLogging,
           enableJsonResponse: options.enableJsonResponse,
         });

@@ -35,7 +35,9 @@ interface TestServerConfig {
   ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
 }
 
-type ElysiaServer = Awaited<ReturnType<typeof createTestServer>>['server'];
+type ElysiaServer =
+  | Awaited<ReturnType<typeof createTestServer>>['server']
+  | Awaited<ReturnType<typeof createTestAuthServer>>['server'];
 
 /**
  * Helper to create and start test HTTP server with MCP setup
@@ -71,6 +73,7 @@ async function createTestServer(config?: TestServerConfig) {
       enableLogging: true,
       enableJsonResponse: enableJson,
       stateless: config?.stateless ?? false,
+      eventStore: config?.eventStore,
       serverInfo: {
         name: 'test-server',
         version: '1.0.0',
@@ -95,11 +98,7 @@ async function createTestServer(config?: TestServerConfig) {
  */
 async function createTestAuthServer(
   config: TestServerConfig = { sessionIdGenerator: () => Bun.randomUUIDv7() }
-): Promise<{
-  server: ElysiaServer;
-  transport: ElysiaStreamingHttpTransport;
-  mcpServer: McpServer;
-}> {
+) {
   const mcpServer = new McpServer(
     { name: 'test-server', version: '1.0.0' },
     { capabilities: { logging: {} } }
@@ -1480,7 +1479,7 @@ describe('ElysiaStreamingHttpTransport with resumability', () => {
     storedEvents.clear();
   });
 
-  it.skip('should store and include event IDs in server SSE messages', async () => {
+  it('should store and include event IDs in server SSE messages', async () => {
     // Send a notification that should be stored with an event ID
     const notification: JSONRPCMessage = {
       jsonrpc: '2.0',
@@ -1535,7 +1534,14 @@ describe('ElysiaStreamingHttpTransport with resumability', () => {
     expect(storedEvent?.message).toMatchObject(notification);
   });
 
+  //skip for now because it's not working with unit tests
   it.skip('should store and replay MCP server tool notifications', async () => {
+    setTimeout(() => {
+      mcpServer.server.sendLoggingMessage({
+        level: 'info',
+        data: 'First notification from MCP server',
+      });
+    }, 50);
     // Establish a standalone SSE stream
     const sseResponse = await server.handle(
       new Request('http://localhost/mcp', {
@@ -1547,10 +1553,6 @@ describe('ElysiaStreamingHttpTransport with resumability', () => {
       })
     );
     expect(sseResponse.status).toBe(200); // Send a server notification through the MCP server
-    await mcpServer.server.sendLoggingMessage({
-      level: 'info',
-      data: 'First notification from MCP server',
-    });
 
     // Read the notification from the SSE stream
     const reader = sseResponse.body?.getReader();
@@ -1575,7 +1577,6 @@ describe('ElysiaStreamingHttpTransport with resumability', () => {
 
     const firstEventId = idMatch[1];
 
-    // Send a second notification
     await mcpServer.server.sendLoggingMessage({
       level: 'info',
       data: 'Second notification from MCP server',
