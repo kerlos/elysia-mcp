@@ -1,5 +1,5 @@
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   ErrorCode,
   isInitializeRequest,
@@ -19,6 +19,7 @@ export interface MCPPluginOptions {
   };
   capabilities?: ServerCapabilities;
   enableLogging?: boolean;
+  enableJsonResponse?: boolean;
   authentication?: (
     context: McpContext
   ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
@@ -96,6 +97,7 @@ export const mcp = (options: MCPPluginOptions = {}) => {
             transports[sessionId] = transport;
           },
           enableLogging,
+          enableJsonResponse: options.enableJsonResponse,
         });
 
         transport.onclose = () => {
@@ -173,16 +175,16 @@ export const mcp = (options: MCPPluginOptions = {}) => {
 
       if (options.authentication) {
         const { authInfo, response } = await options.authentication(context);
+        // if authInfo is provided, store it in the context
         if (authInfo) {
           context.store.authInfo = authInfo;
           return;
         }
+        // if response is provided, return response and do not continue
         if (response) {
           return response;
         }
-        throw new Error(
-          'Invalid authentication, no authInfo or response provided'
-        );
+        // if no authInfo or response is provided, continue
       }
     })
     .onError(({ error, code, set }) => {

@@ -14,6 +14,8 @@ import type {
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
 import { z } from 'zod';
+import type { McpContext } from '../src/types';
+import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 
 /**
  * Test server configuration for ElysiaStreamingHttpTransport tests
@@ -27,6 +29,9 @@ interface TestServerConfig {
     parsedBody?: unknown
   ) => Promise<void>;
   eventStore?: EventStore;
+  authentication?: (
+    context: McpContext
+  ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
 }
 
 type ElysiaServer = Awaited<ReturnType<typeof createTestServer>>['server'];
@@ -34,9 +39,7 @@ type ElysiaServer = Awaited<ReturnType<typeof createTestServer>>['server'];
 /**
  * Helper to create and start test HTTP server with MCP setup
  */
-async function createTestServer(
-  config: TestServerConfig = { sessionIdGenerator: () => Bun.randomUUIDv7() }
-) {
+async function createTestServer(config?: TestServerConfig) {
   const mcpServer = new McpServer(
     { name: 'test-server', version: '1.0.0' },
     { capabilities: { logging: {} } }
@@ -51,10 +54,11 @@ async function createTestServer(
     }
   );
 
+  const enableJson = config?.enableJsonResponse ?? false;
   const transport = new ElysiaStreamingHttpTransport({
-    sessionIdGenerator: config.sessionIdGenerator,
-    enableJsonResponse: config.enableJsonResponse ?? false,
-    eventStore: config.eventStore,
+    sessionIdGenerator: config?.sessionIdGenerator ?? Bun.randomUUIDv7,
+    enableJsonResponse: enableJson,
+    eventStore: config?.eventStore,
   });
 
   await mcpServer.connect(transport);
@@ -64,6 +68,7 @@ async function createTestServer(
       mcpServer,
       basePath: '/mcp',
       enableLogging: true,
+      enableJsonResponse: enableJson,
       serverInfo: {
         name: 'test-server',
         version: '1.0.0',
@@ -114,6 +119,7 @@ async function createTestAuthServer(
         name: 'test-server',
         version: '1.0.0',
       },
+      authentication: config.authentication,
     })
   );
 
@@ -192,8 +198,8 @@ async function sendPostRequest(
   extraHeaders?: Record<string, string>
 ): Promise<Response> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json, text/event-stream',
+    'content-type': 'application/json',
+    accept: 'application/json, text/event-stream',
     ...extraHeaders,
   };
 
@@ -1001,11 +1007,26 @@ describe('ElysiaStreamingHttpTransport', () => {
 describe('ElysiaStreamingHttpTransport with AuthInfo', () => {
   let server: ElysiaServer;
   let transport: ElysiaStreamingHttpTransport;
-  let baseUrl: URL;
   let sessionId: string;
 
   beforeEach(async () => {
-    const result = await createTestAuthServer();
+    const result = await createTestAuthServer({
+      sessionIdGenerator: () => Bun.randomUUIDv7(),
+      authentication: async (context) => {
+        const authHeader = context.request.headers.get('authorization');
+        if (!authHeader) {
+          return {};
+        }
+        const token = authHeader.split(' ')[1];
+        return {
+          authInfo: {
+            clientId: 'test-client-id',
+            scopes: ['test-scope'],
+            token: token,
+          },
+        };
+      },
+    });
     server = result.server;
     transport = result.transport;
   });
