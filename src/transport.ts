@@ -28,7 +28,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
     string,
     {
       ctx: McpContext;
-      stream?: AsyncGenerator<string>;
+      stream?: AsyncGenerator<string | string[]>;
       resolve?: (data: JSONRPCMessage | JSONRPCMessage[] | null) => void;
     }
   >();
@@ -67,7 +67,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
   }
 
   private writeSSEEvent(
-    stream: AsyncGenerator<string>,
+    stream: AsyncGenerator<string | string[]>,
     message: JSONRPCMessage,
     eventId?: string
   ): boolean {
@@ -89,7 +89,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
   }
 
   // Generator function for Elysia streaming
-  async *stream(): AsyncGenerator<string, void, unknown> {
+  async *stream(): AsyncGenerator<string | string[], void, unknown> {
     while (this._started) {
       if (this._messageQueue.length > 0) {
         const messagesToSend: string[] = [];
@@ -102,11 +102,11 @@ export class ElysiaStreamingHttpTransport implements Transport {
         if (messagesToSend.length === 1) {
           yield messagesToSend[0];
         } else {
-          messagesToSend;
-        }
+          yield messagesToSend;
+        } 
       }
       // Small delay to prevent tight loop
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
 
