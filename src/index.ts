@@ -24,6 +24,7 @@ export interface MCPPluginOptions {
     context: McpContext
   ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
   setupServer?: (server: McpServer) => void | Promise<void>;
+  stateless?: boolean;
   mcpServer?: McpServer;
 }
 
@@ -61,6 +62,31 @@ export const mcp = (options: MCPPluginOptions = {}) => {
     logger.log(
       `${request.method} ${request.url} ${body ? JSON.stringify(body) : ''}`
     );
+
+    if (options.stateless) {
+      const transport = new ElysiaStreamingHttpTransport({
+        sessionIdGenerator: undefined,
+        enableLogging,
+        enableJsonResponse: options.enableJsonResponse,
+      });
+
+      const statelessServer =
+        options.mcpServer ||
+        new McpServer(serverInfo, {
+          capabilities: options.capabilities || {},
+        });
+      if (options.setupServer) {
+        await options.setupServer(statelessServer);
+      }
+
+      await statelessServer.connect(transport);
+
+      //Receive response and close transport and server
+      const response = await transport.handleRequest(context);
+      transport.close();
+      statelessServer.close();
+      return response;
+    }
 
     try {
       const sessionId = request.headers.get('mcp-session-id');

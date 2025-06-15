@@ -29,6 +29,7 @@ interface TestServerConfig {
     parsedBody?: unknown
   ) => Promise<void>;
   eventStore?: EventStore;
+  stateless?: boolean;
   authentication?: (
     context: McpContext
   ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
@@ -69,6 +70,7 @@ async function createTestServer(config?: TestServerConfig) {
       basePath: '/mcp',
       enableLogging: true,
       enableJsonResponse: enableJson,
+      stateless: config?.stateless ?? false,
       serverInfo: {
         name: 'test-server',
         version: '1.0.0',
@@ -311,7 +313,7 @@ describe('ElysiaStreamingHttpTransport', () => {
     );
   });
 
-  it.skip('should handle post requests via sse response correctly', async () => {
+  it('should handle post requests via sse response correctly', async () => {
     sessionId = await initializeServer();
 
     const response = await sendPostRequest(
@@ -349,7 +351,7 @@ describe('ElysiaStreamingHttpTransport', () => {
     });
   });
 
-  it.skip('should call a tool and return the result', async () => {
+  it('should call a tool and return the result', async () => {
     sessionId = await initializeServer();
 
     const toolCallMessage: JSONRPCMessage = {
@@ -1594,7 +1596,10 @@ describe('ElysiaStreamingHttpTransport in stateless mode', () => {
   let baseUrl: URL;
 
   beforeEach(async () => {
-    const result = await createTestServer({ sessionIdGenerator: undefined });
+    const result = await createTestServer({
+      sessionIdGenerator: undefined,
+      stateless: true,
+    });
     server = result.server;
     transport = result.transport;
   });
@@ -1603,7 +1608,7 @@ describe('ElysiaStreamingHttpTransport in stateless mode', () => {
     await stopTestServer({ server, transport });
   });
 
-  it.skip('should operate without session ID validation', async () => {
+  it('should operate without session ID validation', async () => {
     // Initialize the server first
     const initResponse = await sendPostRequest(
       server,
@@ -1623,7 +1628,7 @@ describe('ElysiaStreamingHttpTransport in stateless mode', () => {
     expect(toolsResponse.status).toBe(200);
   });
 
-  it.skip('should handle POST requests with various session IDs in stateless mode', async () => {
+  it('should handle POST requests with various session IDs in stateless mode', async () => {
     await sendPostRequest(server, TEST_MESSAGES.initialize);
 
     // Try with a random session ID - should be accepted
