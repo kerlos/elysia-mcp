@@ -106,7 +106,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
         } 
       }
       // Small delay to prevent tight loop
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     }
   }
 
