@@ -5,10 +5,12 @@ import {
   SUPPORTED_PROTOCOL_VERSIONS,
   type ServerCapabilities,
 } from '@modelcontextprotocol/sdk/types.js';
-import { Elysia } from 'elysia';
+import { Elysia, t } from 'elysia';
 import { ElysiaStreamingHttpTransport } from './transport';
 import type { McpContext } from './types';
 import { Logger } from './utils/logger';
+import { TypeCompiler } from '@sinclair/typebox/compiler';
+import { type TSchema, Type } from '@sinclair/typebox';
 
 // Plugin options
 export interface MCPPluginOptions {
@@ -52,11 +54,38 @@ export const mcp = (options: MCPPluginOptions = {}) => {
   const basePath = options.basePath || '/mcp';
   const enableLogging = options.enableLogging ?? false;
   const logger = new Logger(enableLogging);
+  const Nullable = <T extends TSchema>(T: T) => {
+    return Type.Union([T, Type.Null()]);
+  };
+  const bodySchema = Type.Object({
+    jsonrpc: Type.Literal('2.0'),
+    id: Nullable(Type.Union([Type.String(), Type.Number()])),
+    method: Type.String(),
+    params: Type.Any(),
+  });
+  const bodyCheck = TypeCompiler.Compile(
+    Type.Union([bodySchema, Type.Array(bodySchema)])
+  );
 
   // Shared handler function
   const mcpHandler = async (context: McpContext) => {
     const { request, set, body } = context;
     await setupPromise;
+    if (body) {
+      const bodyValid = bodyCheck.Check(body);
+      if (!bodyValid) {
+        set.status = 400;
+        return {
+          jsonrpc: '2.0',
+          error: {
+            code: -32700,
+            message: 'Parse error',
+            data: bodyCheck.Errors(body),
+          },
+          id: null,
+        };
+      }
+    }
 
     logger.log(
       `${request.method} ${request.url} ${body ? JSON.stringify(body) : ''}`
@@ -155,6 +184,23 @@ export const mcp = (options: MCPPluginOptions = {}) => {
           };
         }
       }
+
+      if (context.request.method === 'POST') {
+        const contentType = context.request.headers.get('content-type');
+        if (contentType !== 'application/json') {
+          context.set.status = 415;
+          return {
+            jsonrpc: '2.0',
+            error: {
+              code: -32000,
+              message:
+                'Unsupported Media Type: Content-Type must be application/json',
+            },
+            id: null,
+          };
+        }
+      }
+
       if (options.authentication) {
         const { authInfo, response } = await options.authentication(context);
         if (authInfo) {

@@ -38,7 +38,8 @@
   "author": "Vatunyoo Suwannapisit <s.vatunyoo@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1"
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@sinclair/typebox": "^0.34.35"
   },
   "peerDependencies": {
     "elysia": ">=1.0.0"
