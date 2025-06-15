@@ -54,7 +54,8 @@ The [elysia-mcp-starter](https://github.com/kerlos/elysia-mcp-starter) template 
 
 ```typescript
 import { Elysia } from 'elysia';
-import { mcp, McpServer } from 'elysia-mcp';
+import { mcp } from 'elysia-mcp';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 const app = new Elysia()
