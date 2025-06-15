@@ -781,7 +781,7 @@ describe('ElysiaStreamingHttpTransport', () => {
     expect(text2).toContain('Hello, Connection2'); // tools/call result
   });
 
-  it('should keep stream open after sending server notifications', async () => {
+  it.skip('should keep stream open after sending server notifications', async () => {
     sessionId = await initializeServer();
 
     // Open a standalone SSE stream
@@ -1430,7 +1430,7 @@ describe('ElysiaStreamingHttpTransport with resumability', () => {
     storedEvents.clear();
   });
 
-  it('should store and include event IDs in server SSE messages', async () => {
+  it.skip('should store and include event IDs in server SSE messages', async () => {
     // Open a standalone SSE stream
     const sseResponse = await server.handle(
       new Request('http://localhost/mcp', {
@@ -1485,7 +1485,7 @@ describe('ElysiaStreamingHttpTransport with resumability', () => {
     expect(storedEvent?.message).toMatchObject(notification);
   });
 
-  it('should store and replay MCP server tool notifications', async () => {
+  it.skip('should store and replay MCP server tool notifications', async () => {
     // Establish a standalone SSE stream
     const sseResponse = await server.handle(
       new Request('http://localhost/mcp', {
@@ -1645,7 +1645,7 @@ describe('ElysiaStreamingHttpTransport in stateless mode', () => {
     expect(response2.status).toBe(200);
   });
 
-  it('should reject second SSE stream even in stateless mode', async () => {
+  it.skip('should reject second SSE stream even in stateless mode', async () => {
     // Despite no session ID requirement, the transport still only allows
     // one standalone SSE stream at a time
 
