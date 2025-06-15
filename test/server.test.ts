@@ -1,4 +1,4 @@
-import { mcp } from './../src/index';
+import { mcp, transports } from './../src/index';
 import { ElysiaStreamingHttpTransport } from './../src/transport';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -75,6 +75,16 @@ async function createTestServer(config?: TestServerConfig) {
         name: 'test-server',
         version: '1.0.0',
       },
+    }).post('/sendNotification', async ({ body, headers }) => {
+      const mcpSessionId = headers['mcp-session-id'];
+      if (!mcpSessionId) {
+        throw new Error('mcp-session-id is required');
+      }
+      const notiTransport = transports[mcpSessionId];
+      if (!notiTransport) {
+        throw new Error('mcp-session-id is not valid');
+      }
+      await notiTransport.send(body as JSONRPCMessage);
     })
   );
   return { server, transport, mcpServer };
@@ -218,6 +228,28 @@ async function sendPostRequest(
       body: JSON.stringify(message),
     })
   );
+}
+
+async function scheduleSendMessage(
+  server: ElysiaServer,
+  message: JSONRPCMessage,
+  sessionId: string,
+  delay = 50
+) {
+  setTimeout(async () => {
+    await server.handle(
+      new Request('http://localhost/sendNotification', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'content-type': 'application/json',
+          'mcp-session-id': sessionId,
+          'mcp-protocol-version': '2025-03-26',
+        },
+        body: JSON.stringify(message),
+      })
+    );
+  }, delay);
 }
 
 function expectErrorResponse(
@@ -418,9 +450,19 @@ describe('ElysiaStreamingHttpTransport', () => {
     expectErrorResponse(errorData, -32001, /Session not found/);
   });
 
-  it.skip('should establish standalone SSE stream and receive server-initiated messages', async () => {
+  it('should establish standalone SSE stream and receive server-initiated messages', async () => {
     // First initialize to get a session ID
     sessionId = await initializeServer();
+
+    // Send a notification (server-initiated message) that should appear on SSE stream
+    const notification: JSONRPCMessage = {
+      jsonrpc: '2.0',
+      method: 'notifications/message',
+      params: { level: 'info', data: 'Test notification' },
+    };
+
+    // schedule the send notification
+    scheduleSendMessage(server, notification, sessionId);
 
     const sseResponse = await server.handle(
       new Request('http://localhost/mcp', {
@@ -435,16 +477,6 @@ describe('ElysiaStreamingHttpTransport', () => {
 
     expect(sseResponse.status).toBe(200);
     expect(sseResponse.headers.get('content-type')).toBe('text/event-stream');
-
-    // Send a notification (server-initiated message) that should appear on SSE stream
-    const notification: JSONRPCMessage = {
-      jsonrpc: '2.0',
-      method: 'notifications/message',
-      params: { level: 'info', data: 'Test notification' },
-    };
-
-    // Send the notification via transport
-    await transport.send(notification);
 
     // Read from the stream and verify we got the notification
     const text = await readSSEEvent(sseResponse);
@@ -465,9 +497,17 @@ describe('ElysiaStreamingHttpTransport', () => {
     });
   });
 
-  it.skip('should not close GET SSE stream after sending multiple server notifications', async () => {
+  it('should not close GET SSE stream after sending multiple server notifications', async () => {
     sessionId = await initializeServer();
+    // Send multiple notifications
+    const notification1: JSONRPCMessage = {
+      jsonrpc: '2.0',
+      method: 'notifications/message',
+      params: { level: 'info', data: 'First notification' },
+    };
 
+    // schedule the send notification
+    scheduleSendMessage(server, notification1, sessionId);
     // Open a standalone SSE stream
     const sseResponse = await server.handle(
       new Request('http://localhost/mcp', {
@@ -483,16 +523,6 @@ describe('ElysiaStreamingHttpTransport', () => {
     expect(sseResponse.status).toBe(200);
     const reader = sseResponse.body?.getReader();
 
-    // Send multiple notifications
-    const notification1: JSONRPCMessage = {
-      jsonrpc: '2.0',
-      method: 'notifications/message',
-      params: { level: 'info', data: 'First notification' },
-    };
-
-    // Just send one and verify it comes through - then the stream should stay open
-    await transport.send(notification1);
-
     if (!reader) {
       throw new Error('No reader found');
     }
@@ -503,8 +533,16 @@ describe('ElysiaStreamingHttpTransport', () => {
     expect(done).toBe(false); // Stream should still be open
   });
 
-  it.skip('should reject second SSE stream for the same session', async () => {
+  it('should reject second SSE stream for the same session', async () => {
     sessionId = await initializeServer();
+
+    // send a notification to get response
+    const notification: JSONRPCMessage = {
+      jsonrpc: '2.0',
+      method: 'notifications/message',
+      params: { level: 'info', data: 'First notification' },
+    };
+    scheduleSendMessage(server, notification, sessionId);
 
     // Open first SSE stream
     const firstStream = await server.handle(
@@ -633,6 +671,7 @@ describe('ElysiaStreamingHttpTransport', () => {
     expect(response.status).toBe(202);
   });
 
+  //remove from future version so skip batching for now
   it.skip('should handle batch request messages with SSE stream for responses', async () => {
     sessionId = await initializeServer();
 
@@ -651,15 +690,7 @@ describe('ElysiaStreamingHttpTransport', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/event-stream');
 
-    const reader = response.body?.getReader();
-
-    // The responses may come in any order or together in one chunk
-    if (!reader) {
-      throw new Error('No reader found');
-    }
-
-    const { value } = await reader.read();
-    const text = new TextDecoder().decode(value);
+    const text = await readSSEEvent(response);
 
     // Check that both responses were sent on the same stream
     expect(text).toContain('"id":"req-1"');
@@ -708,6 +739,7 @@ describe('ElysiaStreamingHttpTransport', () => {
     });
   });
 
+  //we don't need to test this because we didn't create transport if it's not initialized
   it.skip('should reject requests to uninitialized server', async () => {
     // Create a new HTTP server and transport without initializing
     const { server: uninitializedServer, transport: uninitializedTransport } =
@@ -766,31 +798,40 @@ describe('ElysiaStreamingHttpTransport', () => {
 
     // Get both responses
     const [response1, response2] = await Promise.all([req1, req2]);
-    const reader1 = response1.body?.getReader();
-    const reader2 = response2.body?.getReader();
 
-    // Read responses from each stream (requires each receives its specific response)
-    if (!reader1) {
-      throw new Error('No reader found');
-    }
+    const text1 = await readSSEEvent(response1);
+    const text2 = await readSSEEvent(response2);
 
-    const { value: value1 } = await reader1.read();
-    const text1 = new TextDecoder().decode(value1);
     expect(text1).toContain('"id":"req-1"');
     expect(text1).toContain('"tools"'); // tools/list result
 
-    if (!reader2) {
-      throw new Error('No reader found');
-    }
-
-    const { value: value2 } = await reader2.read();
-    const text2 = new TextDecoder().decode(value2);
     expect(text2).toContain('"id":"req-2"');
     expect(text2).toContain('Hello, Connection2'); // tools/call result
   });
 
-  it.skip('should keep stream open after sending server notifications', async () => {
+  it('should keep stream open after sending server notifications', async () => {
     sessionId = await initializeServer();
+
+    // Send several server-initiated notifications
+    scheduleSendMessage(
+      server,
+      {
+        jsonrpc: '2.0',
+        method: 'notifications/message',
+        params: { level: 'info', data: 'First notification' },
+      },
+      sessionId
+    );
+
+    scheduleSendMessage(
+      server,
+      {
+        jsonrpc: '2.0',
+        method: 'notifications/message',
+        params: { level: 'info', data: 'Second notification' },
+      },
+      sessionId
+    );
 
     // Open a standalone SSE stream
     const sseResponse = await server.handle(
@@ -803,19 +844,6 @@ describe('ElysiaStreamingHttpTransport', () => {
         },
       })
     );
-
-    // Send several server-initiated notifications
-    await transport.send({
-      jsonrpc: '2.0',
-      method: 'notifications/message',
-      params: { level: 'info', data: 'First notification' },
-    });
-
-    await transport.send({
-      jsonrpc: '2.0',
-      method: 'notifications/message',
-      params: { level: 'info', data: 'Second notification' },
-    });
 
     // Stream should still be open - it should not close after sending notifications
     expect(sseResponse.bodyUsed).toBe(false);
@@ -1453,6 +1481,13 @@ describe('ElysiaStreamingHttpTransport with resumability', () => {
   });
 
   it.skip('should store and include event IDs in server SSE messages', async () => {
+    // Send a notification that should be stored with an event ID
+    const notification: JSONRPCMessage = {
+      jsonrpc: '2.0',
+      method: 'notifications/message',
+      params: { level: 'info', data: 'Test notification with event ID' },
+    };
+    scheduleSendMessage(server, notification, sessionId);
     // Open a standalone SSE stream
     const sseResponse = await server.handle(
       new Request('http://localhost/mcp', {
@@ -1468,15 +1503,8 @@ describe('ElysiaStreamingHttpTransport with resumability', () => {
     expect(sseResponse.status).toBe(200);
     expect(sseResponse.headers.get('content-type')).toBe('text/event-stream');
 
-    // Send a notification that should be stored with an event ID
-    const notification: JSONRPCMessage = {
-      jsonrpc: '2.0',
-      method: 'notifications/message',
-      params: { level: 'info', data: 'Test notification with event ID' },
-    };
-
     // Send the notification via transport
-    await transport.send(notification);
+    //await transport.send(notification);
 
     // Read from the stream and verify we got the notification with an event ID
     const reader = sseResponse.body?.getReader();
