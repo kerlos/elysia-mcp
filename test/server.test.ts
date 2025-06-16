@@ -1,209 +1,37 @@
-import { mcp, transports } from './../src/index';
-import { ElysiaStreamingHttpTransport } from './../src/transport';
+import type { ElysiaStreamingHttpTransport } from './../src/transport';
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type {
   EventId,
   EventStore,
   StreamId,
 } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type {
-  CallToolResult,
-  JSONRPCMessage,
-} from '@modelcontextprotocol/sdk/types.js';
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { Elysia } from 'elysia';
-import { z } from 'zod';
-import type { McpContext } from '../src/types';
-import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
+import {
+  createTestAuthServer,
+  createTestServer,
+  readSSEEvent,
+  stopTestServer,
+  TEST_MESSAGES,
+  type TestServer,
+} from './test-utils';
 
 /**
  * Test server configuration for ElysiaStreamingHttpTransport tests
  */
-interface TestServerConfig {
-  sessionIdGenerator: (() => string) | undefined;
-  enableJsonResponse?: boolean;
-  customRequestHandler?: (
-    req: Request,
-    res: Response,
-    parsedBody?: unknown
-  ) => Promise<void>;
-  eventStore?: EventStore;
-  stateless?: boolean;
-  authentication?: (
-    context: McpContext
-  ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
-}
-
-type ElysiaServer =
-  | Awaited<ReturnType<typeof createTestServer>>['server']
-  | Awaited<ReturnType<typeof createTestAuthServer>>['server'];
-
-/**
- * Helper to create and start test HTTP server with MCP setup
- */
-async function createTestServer(config?: TestServerConfig) {
-  const mcpServer = new McpServer(
-    { name: 'test-server', version: '1.0.0' },
-    { capabilities: { logging: {} } }
-  );
-
-  mcpServer.tool(
-    'greet',
-    'A simple greeting tool',
-    { name: z.string().describe('Name to greet') },
-    async ({ name }): Promise<CallToolResult> => {
-      return { content: [{ type: 'text', text: `Hello, ${name}!` }] };
-    }
-  );
-
-  const enableJson = config?.enableJsonResponse ?? false;
-  const transport = new ElysiaStreamingHttpTransport({
-    sessionIdGenerator: config?.sessionIdGenerator ?? Bun.randomUUIDv7,
-    enableJsonResponse: enableJson,
-    eventStore: config?.eventStore,
-  });
-
-  await mcpServer.connect(transport);
-
-  const server = new Elysia().use(
-    mcp({
-      mcpServer,
-      basePath: '/mcp',
-      enableLogging: true,
-      enableJsonResponse: enableJson,
-      stateless: config?.stateless ?? false,
-      eventStore: config?.eventStore,
-      serverInfo: {
-        name: 'test-server',
-        version: '1.0.0',
-      },
-    }).post('/sendNotification', async ({ body, headers }) => {
-      const mcpSessionId = headers['mcp-session-id'];
-      if (!mcpSessionId) {
-        throw new Error('mcp-session-id is required');
-      }
-      const notiTransport = transports[mcpSessionId];
-      if (!notiTransport) {
-        throw new Error('mcp-session-id is not valid');
-      }
-      await notiTransport.send(body as JSONRPCMessage);
-    })
-  );
-  return { server, transport, mcpServer };
-}
-
-/**
- * Helper to create and start authenticated test HTTP server with MCP setup
- */
-async function createTestAuthServer(
-  config: TestServerConfig = { sessionIdGenerator: () => Bun.randomUUIDv7() }
-) {
-  const mcpServer = new McpServer(
-    { name: 'test-server', version: '1.0.0' },
-    { capabilities: { logging: {} } }
-  );
-
-  mcpServer.tool(
-    'profile',
-    'A user profile data tool',
-    { active: z.boolean().describe('Profile status') },
-    async ({ active }, { authInfo }): Promise<CallToolResult> => {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `${active ? 'Active' : 'Inactive'} profile from token: ${
-              authInfo?.token
-            }!`,
-          },
-        ],
-      };
-    }
-  );
-
-  const server = new Elysia().use(
-    mcp({
-      mcpServer,
-      basePath: '/mcp',
-      serverInfo: {
-        name: 'test-server',
-        version: '1.0.0',
-      },
-      authentication: config.authentication,
-    })
-  );
-
-  const transport = new ElysiaStreamingHttpTransport({
-    sessionIdGenerator: config.sessionIdGenerator,
-    enableJsonResponse: config.enableJsonResponse ?? false,
-    eventStore: config.eventStore,
-  });
-
-  await mcpServer.connect(transport);
-  return { server, transport, mcpServer };
-}
-
-/**
- * Helper to stop test server
- */
-async function stopTestServer({
-  server,
-  transport,
-}: {
-  server: ElysiaServer;
-  transport: ElysiaStreamingHttpTransport;
-}): Promise<void> {
-  // First close the transport to ensure all SSE streams are closed
-  await transport.close();
-
-  // Close the server without waiting indefinitely
-  //server.stop(true);
-}
-
-/**
- * Common test messages
- */
-const TEST_MESSAGES = {
-  initialize: {
-    jsonrpc: '2.0',
-    method: 'initialize',
-    params: {
-      clientInfo: { name: 'test-client', version: '1.0' },
-      protocolVersion: '2025-03-26',
-      capabilities: {},
-    },
-
-    id: 'init-1',
-  } as JSONRPCMessage,
-
-  toolsList: {
-    jsonrpc: '2.0',
-    method: 'tools/list',
-    params: {},
-    id: 'tools-1',
-  } as JSONRPCMessage,
-};
 
 /**
  * Helper to extract text from SSE response
  * Note: Can only be called once per response stream. For multiple reads,
  * get the reader manually and read multiple times.
  */
-async function readSSEEvent(response: Response): Promise<string> {
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error('No reader found');
-  }
-  const { value } = await reader.read();
-  return new TextDecoder().decode(value);
-}
 
 /**
  * Helper to send JSON-RPC request
  */
 async function sendPostRequest(
-  server: ElysiaServer,
+  server: TestServer,
   message: JSONRPCMessage | JSONRPCMessage[],
   sessionId?: string,
   extraHeaders?: Record<string, string>
@@ -230,7 +58,7 @@ async function sendPostRequest(
 }
 
 async function scheduleSendMessage(
-  server: ElysiaServer,
+  server: TestServer,
   message: JSONRPCMessage,
   sessionId: string,
   delay = 50
@@ -266,7 +94,7 @@ function expectErrorResponse(
 }
 
 describe('ElysiaStreamingHttpTransport', () => {
-  let server: ElysiaServer;
+  let server: TestServer;
   let transport: ElysiaStreamingHttpTransport;
   let sessionId: string;
 
@@ -1033,7 +861,7 @@ describe('ElysiaStreamingHttpTransport', () => {
 });
 
 describe('ElysiaStreamingHttpTransport with AuthInfo', () => {
-  let server: ElysiaServer;
+  let server: TestServer;
   let transport: ElysiaStreamingHttpTransport;
   let sessionId: string;
 
@@ -1157,7 +985,7 @@ describe('ElysiaStreamingHttpTransport with AuthInfo', () => {
 
 // Test JSON Response Mode
 describe('ElysiaStreamingHttpTransport with JSON Response Mode', () => {
-  let server: ElysiaServer;
+  let server: TestServer;
   let transport: ElysiaStreamingHttpTransport;
   let baseUrl: URL;
   let sessionId: string;
@@ -1264,7 +1092,7 @@ describe('ElysiaStreamingHttpTransport with JSON Response Mode', () => {
 
 // Test pre-parsed body handling
 describe.skip('ElysiaStreamingHttpTransport with pre-parsed body', () => {
-  let server: ElysiaServer;
+  let server: TestServer;
   let transport: ElysiaStreamingHttpTransport;
   let baseUrl: URL;
   let sessionId: string;
@@ -1410,7 +1238,7 @@ describe.skip('ElysiaStreamingHttpTransport with pre-parsed body', () => {
 
 // Test resumability support
 describe('ElysiaStreamingHttpTransport with resumability', () => {
-  let server: ElysiaServer;
+  let server: TestServer;
   let transport: ElysiaStreamingHttpTransport;
   let baseUrl: URL;
   let sessionId: string;
@@ -1620,7 +1448,7 @@ describe('ElysiaStreamingHttpTransport with resumability', () => {
 
 // Test stateless mode
 describe('ElysiaStreamingHttpTransport in stateless mode', () => {
-  let server: ElysiaServer;
+  let server: TestServer;
   let transport: ElysiaStreamingHttpTransport;
   let baseUrl: URL;
 

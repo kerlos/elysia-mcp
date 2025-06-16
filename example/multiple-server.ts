@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia';
 import { z } from 'zod';
 import { mcp } from '../src/index.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 // Math Operations Plugin
 const mathPlugin = mcp({
