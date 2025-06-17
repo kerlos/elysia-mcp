@@ -352,20 +352,20 @@ export class ElysiaStreamingHttpTransport implements Transport {
         this.onmessage?.(message, { authInfo });
       }
 
-      const keepAlive = setInterval(() => {
-        const currentStream = this._streamMapping.get(streamId)?.stream;
-        if (this._started && currentStream) {
-          this.writeSSEEvent(currentStream, {
-            jsonrpc: '2.0',
-            method: 'ping',
-            params: {},
-            id: 'ping',
-          });
-        }
-      }, 30000);
-      this.onclose = () => {
-        clearInterval(keepAlive);
-      };
+      // const keepAlive = setInterval(() => {
+      //   const currentStream = this._streamMapping.get(streamId)?.stream;
+      //   if (this._started && currentStream) {
+      //     this.writeSSEEvent(currentStream, {
+      //       jsonrpc: '2.0',
+      //       method: 'ping',
+      //       params: {},
+      //       id: 'ping',
+      //     });
+      //   }
+      // }, 30000);
+      // this.onclose = () => {
+      //   clearInterval(keepAlive);
+      // };
       return stream;
     } catch (error) {
       set.status = 400;
