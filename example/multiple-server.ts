@@ -1,7 +1,14 @@
 import { Elysia } from 'elysia';
 import { z } from 'zod';
-import { mcp } from '../src/index.js';
+import { mcp, type ILogger } from '../src/index.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+
+/**
+ * Multiple Server Example with Custom Logger
+ * 
+ * This example shows how to set up multiple MCP servers on different paths.
+ * Each server can have its own logger configuration.
+ */
 
 // Math Operations Plugin
 const mathPlugin = mcp({
@@ -16,11 +23,14 @@ const mathPlugin = mcp({
   enableLogging: true,
   setupServer: async (server: McpServer) => {
     // Addition tool
-    server.tool(
+    server.registerTool(
       'add',
       {
-        a: z.number().describe('First number'),
-        b: z.number().describe('Second number'),
+        description: 'Add two numbers',
+        inputSchema: {
+          a: z.number().describe('First number'),
+          b: z.number().describe('Second number'),
+        },
       },
       async (args) => {
         const { a, b } = args;
@@ -32,11 +42,14 @@ const mathPlugin = mcp({
     );
 
     // Multiplication tool
-    server.tool(
+    server.registerTool(
       'multiply',
       {
-        a: z.number().describe('First number'),
-        b: z.number().describe('Second number'),
+        description: 'Multiply two numbers',
+        inputSchema: {
+          a: z.number().describe('First number'),
+          b: z.number().describe('Second number'),
+        },
       },
       async (args) => {
         const { a, b } = args;
@@ -48,11 +61,14 @@ const mathPlugin = mcp({
     );
 
     // Power tool
-    server.tool(
+    server.registerTool(
       'power',
       {
-        base: z.number().describe('Base number'),
-        exponent: z.number().describe('Exponent'),
+        description: 'Calculate base to the power of exponent',
+        inputSchema: {
+          base: z.number().describe('Base number'),
+          exponent: z.number().describe('Exponent'),
+        },
       },
       async (args) => {
         const { base, exponent } = args;
@@ -78,10 +94,13 @@ const textPlugin = mcp({
   enableLogging: true,
   setupServer: async (server: McpServer) => {
     // Uppercase tool
-    server.tool(
+    server.registerTool(
       'uppercase',
       {
-        text: z.string().describe('Text to convert to uppercase'),
+        description: 'Convert text to uppercase',
+        inputSchema: {
+          text: z.string().describe('Text to convert to uppercase'),
+        },
       },
       async (args) => {
         const { text } = args;
@@ -93,10 +112,13 @@ const textPlugin = mcp({
     );
 
     // Word count tool
-    server.tool(
+    server.registerTool(
       'word_count',
       {
-        text: z.string().describe('Text to count words in'),
+        description: 'Count words in text',
+        inputSchema: {
+          text: z.string().describe('Text to count words in'),
+        },
       },
       async (args) => {
         const { text } = args;
@@ -108,10 +130,13 @@ const textPlugin = mcp({
     );
 
     // Reverse text tool
-    server.tool(
+    server.registerTool(
       'reverse',
       {
-        text: z.string().describe('Text to reverse'),
+        description: 'Reverse text characters',
+        inputSchema: {
+          text: z.string().describe('Text to reverse'),
+        },
       },
       async (args) => {
         const { text } = args;
@@ -123,12 +148,15 @@ const textPlugin = mcp({
     );
 
     // Replace text tool
-    server.tool(
+    server.registerTool(
       'replace',
       {
-        text: z.string().describe('Original text'),
-        search: z.string().describe('Text to search for'),
-        replace: z.string().describe('Text to replace with'),
+        description: 'Replace text with global matching',
+        inputSchema: {
+          text: z.string().describe('Original text'),
+          search: z.string().describe('Text to search for'),
+          replace: z.string().describe('Text to replace with'),
+        },
       },
       async (args) => {
         const { text, search, replace } = args;

@@ -9,27 +9,79 @@ import {
 import { Elysia } from 'elysia';
 import { ElysiaStreamingHttpTransport } from './transport';
 import type { EventStore, McpContext } from './types';
-import { Logger } from './utils/logger';
-// Plugin options
+import { createLogger, type ILogger } from './utils/logger';
+
+/**
+ * Plugin options for the MCP Elysia plugin
+ */
 export interface MCPPluginOptions {
+  /**
+   * Base path for MCP endpoints (default: '/mcp')
+   */
   basePath?: string;
+
+  /**
+   * Server information
+   */
   serverInfo?: {
     name: string;
     version: string;
   };
+
+  /**
+   * MCP server capabilities
+   */
   capabilities?: ServerCapabilities;
+
+  /**
+   * @deprecated Use logger option instead
+   * Enable or disable logging
+   */
   enableLogging?: boolean;
+
+  /**
+   * Custom logger instance (pino, winston, etc.)
+   * If not provided and enableLogging is true, will use default console logger
+   */
+  logger?: ILogger;
+
+  /**
+   * Enable JSON response mode instead of SSE streaming
+   */
   enableJsonResponse?: boolean;
+
+  /**
+   * Authentication handler
+   */
   authentication?: (
     context: McpContext
   ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
+
+  /**
+   * Setup function to configure the MCP server with tools, resources, and prompts
+   */
   setupServer?: (server: McpServer) => void | Promise<void>;
+
+  /**
+   * Enable stateless mode (no session management)
+   */
   stateless?: boolean;
+
+  /**
+   * Provide a custom MCP server instance
+   */
   mcpServer?: McpServer;
+
+  /**
+   * Event store for resumability support
+   */
   eventStore?: EventStore;
 }
 
 export const transports: Record<string, ElysiaStreamingHttpTransport> = {};
+
+// Export logger types and utilities for external use
+export { type ILogger, ConsoleLogger, SilentLogger, createLogger } from './utils/logger';
 
 // Main MCP plugin for Elysia
 export const mcp = (options: MCPPluginOptions = {}) => {
@@ -53,21 +105,27 @@ export const mcp = (options: MCPPluginOptions = {}) => {
   })();
 
   const basePath = options.basePath || '/mcp';
-  const enableLogging = options.enableLogging ?? false;
-  const logger = new Logger(enableLogging);
+  
+  // Create logger with support for custom logger instances
+  const logger = createLogger({
+    enabled: options.enableLogging ?? false,
+    logger: options.logger,
+  });
   // Shared handler function
   const mcpHandler = async (context: McpContext) => {
     const { request, set, body } = context;
     await setupPromise;
 
-    logger.log(
-      `${request.method} ${request.url} ${body ? JSON.stringify(body) : ''}`
+    logger.debug(
+      `${request.method} ${request.url}`,
+      body ? JSON.stringify(body) : ''
     );
 
     if (options.stateless) {
       const transport = new ElysiaStreamingHttpTransport({
         sessionIdGenerator: undefined,
-        enableLogging,
+        enableLogging: options.enableLogging,
+        logger: options.logger,
         enableJsonResponse: options.enableJsonResponse,
       });
 
@@ -124,7 +182,8 @@ export const mcp = (options: MCPPluginOptions = {}) => {
             transports[sessionId] = transport;
           },
           eventStore: options.eventStore,
-          enableLogging,
+          enableLogging: options.enableLogging,
+          logger: options.logger,
           enableJsonResponse: options.enableJsonResponse,
         });
 
@@ -230,7 +289,9 @@ export const mcp = (options: MCPPluginOptions = {}) => {
       }
     })
     .onAfterResponse(({ response }) => {
-      logger.log('response', JSON.stringify(response));
+      if (response && typeof response === 'object') {
+        logger.debug('response', JSON.stringify(response));
+      }
     })
     .all(`${basePath}/*`, mcpHandler)
     .all(basePath, mcpHandler);

@@ -13,6 +13,7 @@ with HTTP transport support.
 - **Type-Safe**: Built with TypeScript and Zod validation
 - **Easy Integration**: Simple plugin architecture for Elysia apps
 - **Comprehensive Support**: Tools, Resources, Prompts, and Logging
+- **Custom Logger Support**: Use any logger (pino, winston, bunyan, etc.)
 - **Error Handling**: Proper JSON-RPC 2.0 error responses
 - **Testing**: Full unit test coverage with Bun test runner
 
@@ -73,10 +74,13 @@ const app = new Elysia()
       },
       setupServer: async (server: McpServer) => {
         // Register your MCP tools, resources, and prompts here
-        server.tool(
+        server.registerTool(
           'echo',
           {
-            text: z.string().describe('Text to echo back'),
+            description: 'Echoes back the provided text',
+            inputSchema: {
+              text: z.string().describe('Text to echo back'),
+            },
           },
           async (args) => {
             return {
@@ -143,8 +147,13 @@ This example demonstrates how to create multiple MCP plugins in a single Elysia 
 
 - `serverInfo`: Server information
 - `capabilities`: MCP capabilities to advertise
-- `enableLogging`: Enable debug logging (default: false)
+- `logger`: Custom logger instance (pino, winston, etc.) - see [Custom Logger](#custom-logger) section
 - `setupServer`: Callback to register tools, resources, and prompts
+- `basePath`: Base path for MCP endpoints (default: '/mcp')
+- `enableJsonResponse`: Enable JSON response mode instead of SSE streaming
+- `stateless`: Enable stateless mode (no session management)
+- `authentication`: Authentication handler for protected routes
+- `eventStore`: Event store for resumability support
 
 ### Session Management
 
@@ -170,6 +179,115 @@ const app = new Elysia().use(
 );
 ```
 
+## Custom Logger
+
+The plugin supports custom logger instances, allowing you to use any logging library that conforms to the `ILogger` interface:
+
+```typescript
+interface ILogger {
+  info(message: string, ...args: unknown[]): void;
+  error(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  debug(message: string, ...args: unknown[]): void;
+}
+```
+
+### Using Pino Logger
+
+```typescript
+import { Elysia } from 'elysia';
+import { mcp } from 'elysia-mcp';
+import pino from 'pino';
+
+const logger = pino({ level: 'debug' });
+
+const app = new Elysia()
+  .use(
+    mcp({
+      logger, // Pass your custom logger
+      serverInfo: {
+        name: 'my-mcp-server',
+        version: '1.0.0',
+      },
+      // ... other options
+    })
+  )
+  .listen(3000);
+```
+
+### Using Winston Logger
+
+```typescript
+import winston from 'winston';
+
+const logger = winston.createLogger({
+  level: 'debug',
+  format: winston.format.json(),
+  transports: [new winston.transports.Console()],
+});
+
+const app = new Elysia()
+  .use(
+    mcp({
+      logger, // Pass your winston logger
+      // ... other options
+    })
+  )
+  .listen(3000);
+```
+
+### Default Console Logger
+
+If you don't provide a custom logger, the plugin will use a default console logger when `enableLogging` is set to `true`:
+
+```typescript
+const app = new Elysia()
+  .use(
+    mcp({
+      enableLogging: true, // Uses default console logger with colors
+      // ... other options
+    })
+  )
+  .listen(3000);
+```
+
+### Custom Logger Implementation
+
+You can also implement your own logger:
+
+```typescript
+import type { ILogger } from 'elysia-mcp';
+
+class MyCustomLogger implements ILogger {
+  info(message: string, ...args: unknown[]): void {
+    // Your custom implementation
+  }
+  
+  error(message: string, ...args: unknown[]): void {
+    // Your custom implementation
+  }
+  
+  warn(message: string, ...args: unknown[]): void {
+    // Your custom implementation
+  }
+  
+  debug(message: string, ...args: unknown[]): void {
+    // Your custom implementation
+  }
+}
+
+const logger = new MyCustomLogger();
+
+const app = new Elysia()
+  .use(
+    mcp({
+      logger,
+      // ... other options
+    })
+  )
+  .listen(3000);
+```
+
 ## API Reference
 
 ### Tools
@@ -177,10 +295,13 @@ const app = new Elysia().use(
 Register tools using the MCP Server instance:
 
 ```typescript
-server.tool(
+server.registerTool(
   'tool-name',
   {
-    param: z.string().describe('Parameter description'),
+    description: 'Tool description',
+    inputSchema: {
+      param: z.string().describe('Parameter description'),
+    },
   },
   async (args) => {
     // Tool implementation
@@ -196,17 +317,25 @@ server.tool(
 Register resources for file or data access:
 
 ```typescript
-server.resource('Resource Name', 'resource://uri', async () => {
-  return {
-    contents: [
-      {
-        uri: 'resource://uri',
-        mimeType: 'text/plain',
-        text: 'Resource content',
-      },
-    ],
-  };
-});
+server.registerResource(
+  'resource-name',
+  'resource://uri',
+  {
+    title: 'Resource Name',
+    description: 'Resource description',
+  },
+  async () => {
+    return {
+      contents: [
+        {
+          uri: 'resource://uri',
+          mimeType: 'text/plain',
+          text: 'Resource content',
+        },
+      ],
+    };
+  }
+);
 ```
 
 ### Prompts
@@ -214,11 +343,14 @@ server.resource('Resource Name', 'resource://uri', async () => {
 Register reusable prompt templates following MCP best practices:
 
 ```typescript
-server.prompt(
+server.registerPrompt(
   'prompt-name',
-  'Prompt description',
   {
-    param: z.string().describe('Parameter description'),
+    title: 'Prompt Title',
+    description: 'Prompt description',
+    argsSchema: {
+      param: z.string().describe('Parameter description'),
+    },
   },
   async (args) => {
     return {
@@ -265,27 +397,75 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ```typescript
 interface MCPPluginOptions {
+  /**
+   * Base path for MCP endpoints (default: '/mcp')
+   */
+  basePath?: string;
+
+  /**
+   * Server information
+   */
   serverInfo?: {
     name: string;
     version: string;
   };
+
+  /**
+   * MCP server capabilities
+   */
   capabilities?: ServerCapabilities;
+
+  /**
+   * @deprecated Use logger option instead
+   * Enable or disable logging
+   */
   enableLogging?: boolean;
+
+  /**
+   * Custom logger instance (pino, winston, etc.)
+   * If not provided and enableLogging is true, will use default console logger
+   */
+  logger?: ILogger;
+
+  /**
+   * Enable JSON response mode instead of SSE streaming
+   */
+  enableJsonResponse?: boolean;
+
+  /**
+   * Authentication handler
+   */
+  authentication?: (
+    context: McpContext
+  ) => Promise<{ authInfo?: AuthInfo; response?: unknown }>;
+
+  /**
+   * Setup function to configure the MCP server with tools, resources, and prompts
+   */
   setupServer?: (server: McpServer) => void | Promise<void>;
+
+  /**
+   * Enable stateless mode (no session management)
+   */
+  stateless?: boolean;
+
+  /**
+   * Provide a custom MCP server instance
+   */
+  mcpServer?: McpServer;
+
+  /**
+   * Event store for resumability support
+   */
+  eventStore?: EventStore;
 }
 ```
 
 ## Architecture
 
-```text
-┌─────────────────┐    ┌──────────────┐    ┌─────────────────┐
-│   HTTP Client   │───▶│ Elysia HTTP  │───▶│    MCP Plugin   │
-│                 │    │   Handler    │    │                 │
-└─────────────────┘    └──────────────┘    └─────────────────┘
-                                                     │
-                                                     │
-                                            ┌─────────────────┐
-                                            │    McpServer    │
-                                            │   (Singleton)   │
-                                            └─────────────────┘
+```mermaid
+flowchart LR
+    A["HTTP Client"] --> B["Elysia HTTP Handler"]
+    B --> C["MCP Plugin"]
+    C --> D["McpServer<br/>(Singleton)"]
 ```
