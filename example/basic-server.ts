@@ -1,11 +1,14 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { PromptMessage } from '@modelcontextprotocol/sdk/types.js';
 import { Elysia } from 'elysia';
 import { z } from 'zod';
+import { type ILogger, mcp } from '../src/index.js';
 import {
-  mcp,
-} from '../src/index.js';
-import type { PromptMessage } from '@modelcontextprotocol/sdk/types.js';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { createTextContent, createResourceContent, createImageContent, createAudioContent } from '../src/types.js';
+  createAudioContent,
+  createImageContent,
+  createResourceContent,
+  createTextContent,
+} from '../src/types.js';
 
 // Example service class
 class ExampleService {
@@ -112,7 +115,12 @@ const app = new Elysia()
         prompts: {},
         logging: {},
       },
+      // Use default console logger
       enableLogging: true,
+
+      // Or use a custom logger (uncomment to use pino):
+      // logger: logger,
+
       setupServer: async (server: McpServer) => {
         // Register tools directly using MCP SDK patterns with Zod schemas
         server.tool(
@@ -124,7 +132,7 @@ const app = new Elysia()
             a: z.number().describe('First number'),
             b: z.number().describe('Second number'),
           },
-          async (args) => {
+          async args => {
             const result = await exampleService.calculate(
               args as {
                 operation: string;
@@ -145,7 +153,7 @@ const app = new Elysia()
             a: z.number().describe('First number'),
             b: z.number().describe('Second number'),
           },
-          async (args) => {
+          async args => {
             const { a, b } = args;
 
             // Basic validation
@@ -170,7 +178,7 @@ const app = new Elysia()
           {
             text: z.string().min(1).describe('Text to echo back'),
           },
-          async (args) => {
+          async args => {
             const { text } = args;
 
             if (!text || typeof text !== 'string') {
@@ -208,7 +216,7 @@ const app = new Elysia()
                 .optional(),
             }),
           },
-          async (args) => {
+          async args => {
             const { user } = args;
             // Basic validation is now handled by Zod, but keeping additional checks for demonstration
             if (!user || typeof user !== 'object') {
@@ -323,7 +331,7 @@ const app = new Elysia()
                 'Include system information as embedded resource (true/false)'
               ),
           },
-          async (args) => {
+          async args => {
             const result = await exampleService.generateGreeting(
               args as {
                 name: string;
@@ -381,7 +389,7 @@ const app = new Elysia()
               .optional()
               .describe('Custom text content to include'),
           },
-          async (args) => {
+          async args => {
             const messages: PromptMessage[] = [];
 
             // Always include text content
@@ -477,15 +485,14 @@ const app = new Elysia()
                 'Include code complexity analysis as embedded resource (true/false)'
               ),
           },
-          async (args) => {
+          async args => {
             const { changes, type, scope, breaking, includeAnalysis } = args;
 
             let prompt = `Generate a conventional commit message for these changes:\n\n${changes}\n\n`;
 
             if (type) prompt += `Preferred type: ${type}\n`;
             if (scope) prompt += `Scope: ${scope}\n`;
-            if (breaking === 'true')
-              prompt += `⚠️  This is a BREAKING CHANGE\n`;
+            if (breaking === 'true') prompt += `⚠️  This is a BREAKING CHANGE\n`;
 
             prompt += `
 Requirements:
@@ -511,9 +518,8 @@ Examples:
             // Include code analysis as embedded resource if requested
             if (includeAnalysis === 'true' && changes) {
               try {
-                const analysis = await demoService.analyzeCodeComplexity(
-                  changes
-                );
+                const analysis =
+                  await demoService.analyzeCodeComplexity(changes);
                 messages.push({
                   role: 'assistant',
                   content: createResourceContent(

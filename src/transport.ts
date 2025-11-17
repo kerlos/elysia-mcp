@@ -1,15 +1,14 @@
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
+  type JSONRPCMessage,
+  JSONRPCMessageSchema,
+  type RequestId,
+  SUPPORTED_PROTOCOL_VERSIONS,
   isInitializeRequest,
   isJSONRPCError,
   isJSONRPCRequest,
   isJSONRPCResponse,
-  JSONRPCMessageSchema,
-  SUPPORTED_PROTOCOL_VERSIONS,
-  type JSONRPCMessage,
-  type RequestId,
 } from '@modelcontextprotocol/sdk/types.js';
-import { Logger } from './utils/logger';
 import type { Context } from 'elysia';
 import type {
   JSONRPCError,
@@ -17,6 +16,7 @@ import type {
   StreamableHTTPServerTransportOptions,
 } from './types';
 import type { EventStore } from './types';
+import { type ILogger, createLogger } from './utils/logger';
 
 /**
  * Configuration options for StreamableHTTPServerTransport
@@ -35,7 +35,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
   private _requestToStreamMapping = new Map<RequestId, string>();
   private _requestResponseMap = new Map<RequestId, JSONRPCMessage>();
   private _standaloneSseStreamId = '_GET_stream';
-  private logger: Logger;
+  private logger: ILogger;
 
   sessionId?: string;
   onclose?: () => void;
@@ -55,7 +55,12 @@ export class ElysiaStreamingHttpTransport implements Transport {
     this._enableJsonResponse = options.enableJsonResponse ?? false;
     this._eventStore = options.eventStore;
     this._onsessioninitialized = options.onsessioninitialized;
-    this.logger = new Logger(options.enableLogging ?? false);
+
+    // Support both new logger interface and legacy enableLogging option
+    this.logger = createLogger({
+      enabled: options.enableLogging ?? false,
+      logger: options.logger,
+    });
   }
 
   async start(): Promise<void> {
@@ -63,7 +68,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
       throw new Error('Transport already started');
     }
     this._started = true;
-    this.logger.log(`[Transport] Starting transport`);
+    this.logger.info('[Transport] Starting transport');
   }
 
   private writeSSEEvent(
@@ -106,7 +111,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
         }
       }
       // Small delay to prevent tight loop
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
   }
 
@@ -165,14 +170,14 @@ export class ElysiaStreamingHttpTransport implements Transport {
     if (path.includes('/resources')) {
       const resourcePath = url.searchParams.get('uri');
       if (resourcePath) {
-        this.logger.log(`Direct resource access: ${resourcePath}`);
+        this.logger.debug(`Direct resource access: ${resourcePath}`);
       }
     } else if (path.includes('/prompts')) {
       const promptName = url.searchParams.get('name');
       if (promptName) {
-        this.logger.log(`Direct prompt access: ${promptName}`);
+        this.logger.debug(`Direct prompt access: ${promptName}`);
       } else {
-        this.logger.log(`Direct prompts listing`);
+        this.logger.debug('Direct prompts listing');
       }
     }
 
@@ -247,7 +252,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
       const rawMessage = body;
 
       const messages: JSONRPCMessage[] = Array.isArray(rawMessage)
-        ? rawMessage.map((msg) => JSONRPCMessageSchema.parse(msg))
+        ? rawMessage.map(msg => JSONRPCMessageSchema.parse(msg))
         : [JSONRPCMessageSchema.parse(rawMessage)];
 
       const isInitializationRequest = messages.some(isInitializeRequest);
@@ -313,7 +318,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
         const resultPromise = new Promise<
           JSONRPCMessage | JSONRPCMessage[] | null
-        >((resolve) => {
+        >(resolve => {
           this._streamMapping.set(streamId, {
             ctx: context,
             resolve: resolve,
@@ -578,7 +583,7 @@ export class ElysiaStreamingHttpTransport implements Transport {
         .filter(([_, sid]) => this._streamMapping.get(sid) === stream)
         .map(([id]) => id);
 
-      const allResponsesReady = relatedIds.every((id) =>
+      const allResponsesReady = relatedIds.every(id =>
         this._requestResponseMap.has(id)
       );
 
@@ -593,8 +598,8 @@ export class ElysiaStreamingHttpTransport implements Transport {
           }
 
           const responses = relatedIds
-            .map((id) => this._requestResponseMap.get(id))
-            .filter((response) => response !== undefined);
+            .map(id => this._requestResponseMap.get(id))
+            .filter(response => response !== undefined);
 
           if (responses.length === 0) {
             stream.resolve?.(null);
@@ -681,10 +686,9 @@ export class ElysiaStreamingHttpTransport implements Transport {
 
   private logMessage(message: JSONRPCMessage) {
     if ('method' in message) {
-      this.logger.log(
-        `method: ${message.method} ${
-          message.params ? 'params: ' + JSON.stringify(message.params) : ''
-        }`
+      this.logger.debug(
+        `method: ${message.method}`,
+        message.params ? JSON.stringify(message.params) : ''
       );
     }
   }

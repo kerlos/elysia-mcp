@@ -93,6 +93,38 @@ function expectErrorResponse(
   });
 }
 
+// Helper to decode reader value (handles both string and Uint8Array)
+function decodeValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value instanceof Uint8Array) {
+    return new TextDecoder().decode(value);
+  }
+  return String(value);
+}
+
+// Helper to parse SSE events properly
+function parseSSEEvent(text: string): JSONRPCMessage {
+  const lines = text.split('\n');
+  const dataLines = lines.filter(line => line.startsWith('data:'));
+  
+  if (dataLines.length === 0) {
+    throw new Error(`No data lines found in SSE text: ${text}`);
+  }
+  
+  // Get the last data line (most recent event)
+  const dataLine = dataLines[dataLines.length - 1];
+  const jsonStr = dataLine.substring(5).trim(); // Remove 'data:' and trim whitespace
+  
+  try {
+    return JSON.parse(jsonStr) as JSONRPCMessage;
+  } catch (e) {
+    console.error('Failed to parse JSON from:', jsonStr);
+    throw e;
+  }
+}
+
 describe('ElysiaStreamingHttpTransport', () => {
   let server: TestServer;
   let transport: ElysiaStreamingHttpTransport;
@@ -187,22 +219,15 @@ describe('ElysiaStreamingHttpTransport', () => {
     const text = await readSSEEvent(response);
 
     // Parse the SSE event
-    const eventLines = text.split('\n');
-    const dataLine = eventLines.find((line) => line.startsWith('data:'));
-    expect(dataLine).toBeDefined();
-
-    if (!dataLine) {
-      throw new Error('No data line found');
-    }
-
-    const eventData = JSON.parse(dataLine.substring(5));
+    const eventData = parseSSEEvent(text);
     expect(eventData).toMatchObject({
       jsonrpc: '2.0',
       result: expect.objectContaining({
         tools: expect.arrayContaining([
           expect.objectContaining({
             name: 'greet',
-            description: 'A simple greeting tool',
+            title: 'A simple greeting tool',
+            description: 'Greets a person by name',
           }),
         ]),
       }),
@@ -229,15 +254,7 @@ describe('ElysiaStreamingHttpTransport', () => {
     expect(response.status).toBe(200);
 
     const text = await readSSEEvent(response);
-    const eventLines = text.split('\n');
-    const dataLine = eventLines.find((line) => line.startsWith('data:'));
-    expect(dataLine).toBeDefined();
-
-    if (!dataLine) {
-      throw new Error('No data line found');
-    }
-
-    const eventData = JSON.parse(dataLine.substring(5));
+    const eventData = parseSSEEvent(text);
     expect(eventData).toMatchObject({
       jsonrpc: '2.0',
       result: {
@@ -307,16 +324,7 @@ describe('ElysiaStreamingHttpTransport', () => {
 
     // Read from the stream and verify we got the notification
     const text = await readSSEEvent(sseResponse);
-
-    const eventLines = text.split('\n');
-    const dataLine = eventLines.find((line) => line.startsWith('data:'));
-    expect(dataLine).toBeDefined();
-
-    if (!dataLine) {
-      throw new Error('No data line found');
-    }
-
-    const eventData = JSON.parse(dataLine.substring(5));
+    const eventData = parseSSEEvent(text);
     expect(eventData).toMatchObject({
       jsonrpc: '2.0',
       method: 'notifications/message',
@@ -355,7 +363,7 @@ describe('ElysiaStreamingHttpTransport', () => {
     }
 
     const { value, done } = await reader.read();
-    const text = new TextDecoder().decode(value);
+    const text = decodeValue(value);
     expect(text).toContain('First notification');
     expect(done).toBe(false); // Stream should still be open
   });
@@ -919,15 +927,7 @@ describe('ElysiaStreamingHttpTransport with AuthInfo', () => {
     expect(response.status).toBe(200);
 
     const text = await readSSEEvent(response);
-    const eventLines = text.split('\n');
-    const dataLine = eventLines.find((line) => line.startsWith('data:'));
-    expect(dataLine).toBeDefined();
-
-    if (!dataLine) {
-      throw new Error('No data line found');
-    }
-
-    const eventData = JSON.parse(dataLine.substring(5));
+    const eventData = parseSSEEvent(text);
     expect(eventData).toMatchObject({
       jsonrpc: '2.0',
       result: {
@@ -959,15 +959,7 @@ describe('ElysiaStreamingHttpTransport with AuthInfo', () => {
     expect(response.status).toBe(200);
 
     const text = await readSSEEvent(response);
-    const eventLines = text.split('\n');
-    const dataLine = eventLines.find((line) => line.startsWith('data:'));
-    expect(dataLine).toBeDefined();
-
-    if (!dataLine) {
-      throw new Error('No data line found');
-    }
-
-    const eventData = JSON.parse(dataLine.substring(5));
+    const eventData = parseSSEEvent(text);
     expect(eventData).toMatchObject({
       jsonrpc: '2.0',
       result: {
@@ -1148,7 +1140,7 @@ describe.skip('ElysiaStreamingHttpTransport with pre-parsed body', () => {
     }
 
     const { value } = await reader.read();
-    const text = new TextDecoder().decode(value);
+    const text = decodeValue(value);
 
     // Verify the response used the pre-parsed body
     expect(text).toContain('"id":"preparsed-1"');
@@ -1186,7 +1178,7 @@ describe.skip('ElysiaStreamingHttpTransport with pre-parsed body', () => {
     }
 
     const { value } = await reader.read();
-    const text = new TextDecoder().decode(value);
+    const text = decodeValue(value);
 
     expect(text).toContain('"id":"batch-1"');
     expect(text).toContain('"tools"');
@@ -1227,7 +1219,7 @@ describe.skip('ElysiaStreamingHttpTransport with pre-parsed body', () => {
     }
 
     const { value } = await reader.read();
-    const text = new TextDecoder().decode(value);
+    const text = decodeValue(value);
 
     // Should have processed the pre-parsed body
     expect(text).toContain('"id":"preparsed-wins"');
@@ -1340,7 +1332,7 @@ describe('ElysiaStreamingHttpTransport with resumability', () => {
     }
 
     const { value } = await reader.read();
-    const text = new TextDecoder().decode(value);
+    const text = decodeValue(value);
 
     // The response should contain an event ID
     expect(text).toContain('id: ');
@@ -1389,7 +1381,7 @@ describe('ElysiaStreamingHttpTransport with resumability', () => {
     }
 
     const { value } = await reader.read();
-    const text = new TextDecoder().decode(value);
+    const text = decodeValue(value);
 
     // Verify the notification was sent with an event ID
     expect(text).toContain('id: ');

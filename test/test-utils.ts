@@ -16,7 +16,18 @@ export async function readSSEEvent(response: Response): Promise<string> {
     throw new Error('No reader found');
   }
   const { value } = await reader.read();
-  return new TextDecoder().decode(value);
+  
+  // Handle both Uint8Array and string responses
+  if (typeof value === 'string') {
+    return value;
+  }
+  
+  if (value instanceof Uint8Array) {
+    return new TextDecoder().decode(value);
+  }
+  
+  // Fallback for other types
+  return String(value);
 }
 
 /**
@@ -53,14 +64,17 @@ export async function createMultipleServer() {
     capabilities: {
       tools: {},
     },
-    enableLogging: true,
+    enableLogging: false, // Disable logging in tests
     setupServer: async (server: McpServer) => {
       // Addition tool
-      server.tool(
+      server.registerTool(
         'add',
         {
-          a: z.number().describe('First number'),
-          b: z.number().describe('Second number'),
+          description: 'Add two numbers',
+          inputSchema: {
+            a: z.number().describe('First number'),
+            b: z.number().describe('Second number'),
+          },
         },
         async (args) => {
           const { a, b } = args;
@@ -72,11 +86,14 @@ export async function createMultipleServer() {
       );
 
       // Multiplication tool
-      server.tool(
+      server.registerTool(
         'multiply',
         {
-          a: z.number().describe('First number'),
-          b: z.number().describe('Second number'),
+          description: 'Multiply two numbers',
+          inputSchema: {
+            a: z.number().describe('First number'),
+            b: z.number().describe('Second number'),
+          },
         },
         async (args) => {
           const { a, b } = args;
@@ -88,11 +105,14 @@ export async function createMultipleServer() {
       );
 
       // Power tool
-      server.tool(
+      server.registerTool(
         'power',
         {
-          base: z.number().describe('Base number'),
-          exponent: z.number().describe('Exponent'),
+          description: 'Calculate base to the power of exponent',
+          inputSchema: {
+            base: z.number().describe('Base number'),
+            exponent: z.number().describe('Exponent'),
+          },
         },
         async (args) => {
           const { base, exponent } = args;
@@ -115,13 +135,16 @@ export async function createMultipleServer() {
     capabilities: {
       tools: {},
     },
-    enableLogging: true,
+    enableLogging: false, // Disable logging in tests
     setupServer: async (server: McpServer) => {
       // Uppercase tool
-      server.tool(
+      server.registerTool(
         'uppercase',
         {
-          text: z.string().describe('Text to convert to uppercase'),
+          description: 'Convert text to uppercase',
+          inputSchema: {
+            text: z.string().describe('Text to convert to uppercase'),
+          },
         },
         async (args) => {
           const { text } = args;
@@ -133,10 +156,13 @@ export async function createMultipleServer() {
       );
 
       // Word count tool
-      server.tool(
+      server.registerTool(
         'word_count',
         {
-          text: z.string().describe('Text to count words in'),
+          description: 'Count words in text',
+          inputSchema: {
+            text: z.string().describe('Text to count words in'),
+          },
         },
         async (args) => {
           const { text } = args;
@@ -148,10 +174,13 @@ export async function createMultipleServer() {
       );
 
       // Reverse text tool
-      server.tool(
+      server.registerTool(
         'reverse',
         {
-          text: z.string().describe('Text to reverse'),
+          description: 'Reverse text characters',
+          inputSchema: {
+            text: z.string().describe('Text to reverse'),
+          },
         },
         async (args) => {
           const { text } = args;
@@ -163,12 +192,15 @@ export async function createMultipleServer() {
       );
 
       // Replace text tool
-      server.tool(
+      server.registerTool(
         'replace',
         {
-          text: z.string().describe('Original text'),
-          search: z.string().describe('Text to search for'),
-          replace: z.string().describe('Text to replace with'),
+          description: 'Replace text with global matching',
+          inputSchema: {
+            text: z.string().describe('Original text'),
+            search: z.string().describe('Text to search for'),
+            replace: z.string().describe('Text to replace with'),
+          },
         },
         async (args) => {
           const { text, search, replace } = args;
@@ -214,10 +246,13 @@ export async function createTestServer(config?: TestServerConfig) {
     { capabilities: { logging: {} } }
   );
 
-  mcpServer.tool(
+  mcpServer.registerTool(
     'greet',
-    'A simple greeting tool',
-    { name: z.string().describe('Name to greet') },
+    {
+      title: 'A simple greeting tool',
+      description: 'Greets a person by name',
+      inputSchema: { name: z.string().describe('Name to greet') },
+    },
     async ({ name }): Promise<CallToolResult> => {
       return { content: [{ type: 'text', text: `Hello, ${name}!` }] };
     }
@@ -228,6 +263,7 @@ export async function createTestServer(config?: TestServerConfig) {
     sessionIdGenerator: config?.sessionIdGenerator ?? Bun.randomUUIDv7,
     enableJsonResponse: enableJson,
     eventStore: config?.eventStore,
+    enableLogging: false, // Disable logging in tests
   });
 
   await mcpServer.connect(transport);
@@ -236,7 +272,7 @@ export async function createTestServer(config?: TestServerConfig) {
     mcp({
       mcpServer,
       basePath: '/mcp',
-      enableLogging: true,
+      enableLogging: false, // Disable logging in tests
       enableJsonResponse: enableJson,
       stateless: config?.stateless ?? false,
       eventStore: config?.eventStore,
@@ -270,10 +306,13 @@ export async function createTestAuthServer(
     { capabilities: { logging: {} } }
   );
 
-  mcpServer.tool(
+  mcpServer.registerTool(
     'profile',
-    'A user profile data tool',
-    { active: z.boolean().describe('Profile status') },
+    {
+      title: 'A user profile data tool',
+      description: 'Gets user profile data based on authentication',
+      inputSchema: { active: z.boolean().describe('Profile status') },
+    },
     async ({ active }, { authInfo }): Promise<CallToolResult> => {
       return {
         content: [
@@ -297,6 +336,7 @@ export async function createTestAuthServer(
         version: '1.0.0',
       },
       authentication: config.authentication,
+      enableLogging: false, // Disable logging in tests
     })
   );
 
@@ -304,6 +344,7 @@ export async function createTestAuthServer(
     sessionIdGenerator: config.sessionIdGenerator,
     enableJsonResponse: config.enableJsonResponse ?? false,
     eventStore: config.eventStore,
+    enableLogging: false, // Disable logging in tests
   });
 
   await mcpServer.connect(transport);

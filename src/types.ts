@@ -227,7 +227,17 @@ export interface StreamableHTTPServerTransportOptions {
    */
   eventStore?: EventStore;
 
+  /**
+   * @deprecated Use logger option instead
+   * Enable or disable logging
+   */
   enableLogging?: boolean;
+
+  /**
+   * Custom logger instance (pino, winston, etc.)
+   * If not provided and enableLogging is true, will use default console logger
+   */
+  logger?: import('./utils/logger').ILogger;
 }
 
 export type JSONRPCError = Omit<JSONRPCErrorRaw, "id"> & { id: null };
