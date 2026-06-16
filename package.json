@@ -36,7 +36,7 @@
   "author": "Vatunyoo Suwannapisit <s.vatunyoo@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.3"
+    "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "peerDependencies": {
     "elysia": ">=1.4.21"

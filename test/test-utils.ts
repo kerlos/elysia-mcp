@@ -16,16 +16,16 @@ export async function readSSEEvent(response: Response): Promise<string> {
     throw new Error('No reader found');
   }
   const { value } = await reader.read();
-  
+
   // Handle both Uint8Array and string responses
   if (typeof value === 'string') {
     return value;
   }
-  
+
   if (value instanceof Uint8Array) {
     return new TextDecoder().decode(value);
   }
-  
+
   // Fallback for other types
   return String(value);
 }
@@ -76,7 +76,7 @@ export async function createMultipleServer() {
             b: z.number().describe('Second number'),
           },
         },
-        async (args) => {
+        async args => {
           const { a, b } = args;
           const result = a + b;
           return {
@@ -95,7 +95,7 @@ export async function createMultipleServer() {
             b: z.number().describe('Second number'),
           },
         },
-        async (args) => {
+        async args => {
           const { a, b } = args;
           const result = a * b;
           return {
@@ -114,7 +114,7 @@ export async function createMultipleServer() {
             exponent: z.number().describe('Exponent'),
           },
         },
-        async (args) => {
+        async args => {
           const { base, exponent } = args;
           const result = base ** exponent;
           return {
@@ -146,7 +146,7 @@ export async function createMultipleServer() {
             text: z.string().describe('Text to convert to uppercase'),
           },
         },
-        async (args) => {
+        async args => {
           const { text } = args;
           const result = text.toUpperCase();
           return {
@@ -164,7 +164,7 @@ export async function createMultipleServer() {
             text: z.string().describe('Text to count words in'),
           },
         },
-        async (args) => {
+        async args => {
           const { text } = args;
           const wordCount = text.trim().split(/\s+/).length;
           return {
@@ -182,7 +182,7 @@ export async function createMultipleServer() {
             text: z.string().describe('Text to reverse'),
           },
         },
-        async (args) => {
+        async args => {
           const { text } = args;
           const result = text.split('').reverse().join('');
           return {
@@ -202,7 +202,7 @@ export async function createMultipleServer() {
             replace: z.string().describe('Text to replace with'),
           },
         },
-        async (args) => {
+        async args => {
           const { text, search, replace } = args;
           const result = text.replace(new RegExp(search, 'g'), replace);
           return {
@@ -265,8 +265,6 @@ export async function createTestServer(config?: TestServerConfig) {
     eventStore: config?.eventStore,
     enableLogging: false, // Disable logging in tests
   });
-
-  await mcpServer.connect(transport);
 
   const server = new Elysia().use(
     mcp({
@@ -346,8 +344,6 @@ export async function createTestAuthServer(
     eventStore: config.eventStore,
     enableLogging: false, // Disable logging in tests
   });
-
-  await mcpServer.connect(transport);
   return { server, transport, mcpServer };
 }
 

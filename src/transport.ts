@@ -568,7 +568,6 @@ export class ElysiaStreamingHttpTransport implements Transport {
     if (!stream) {
       throw new Error(`No stream found for stream ID: ${streamId}`);
     }
-
     if (!this._enableJsonResponse) {
       // Generate and store event ID if event store is provided
       const eventId = await this.storeEvent(streamId, message);

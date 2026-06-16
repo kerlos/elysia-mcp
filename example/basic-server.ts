@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { PromptMessage } from '@modelcontextprotocol/sdk/types.js';
 import { Elysia } from 'elysia';
 import { z } from 'zod';
-import { type ILogger, mcp } from '../src/index.js';
+import { mcp } from '../src/index.js';
 import {
   createAudioContent,
   createImageContent,
@@ -123,14 +123,17 @@ const app = new Elysia()
 
       setupServer: async (server: McpServer) => {
         // Register tools directly using MCP SDK patterns with Zod schemas
-        server.tool(
+        server.registerTool(
           'calculate',
           {
-            operation: z
-              .enum(['add', 'subtract', 'multiply', 'divide'])
-              .describe('The arithmetic operation to perform'),
-            a: z.number().describe('First number'),
-            b: z.number().describe('Second number'),
+            description: 'Perform basic arithmetic operations',
+            inputSchema: {
+              operation: z
+                .enum(['add', 'subtract', 'multiply', 'divide'])
+                .describe('The arithmetic operation to perform'),
+              a: z.number().describe('First number'),
+              b: z.number().describe('Second number'),
+            },
           },
           async args => {
             const result = await exampleService.calculate(
@@ -147,11 +150,14 @@ const app = new Elysia()
         );
 
         // Simple add tool following MCP SDK pattern with Zod schema
-        server.tool(
+        server.registerTool(
           'add',
           {
-            a: z.number().describe('First number'),
-            b: z.number().describe('Second number'),
+            description: 'Add two numbers',
+            inputSchema: {
+              a: z.number().describe('First number'),
+              b: z.number().describe('Second number'),
+            },
           },
           async args => {
             const { a, b } = args;
@@ -167,16 +173,26 @@ const app = new Elysia()
           }
         );
 
-        server.tool('get_time', {}, async () => {
-          return {
-            content: [{ type: 'text', text: new Date().toISOString() }],
-          };
-        });
+        server.registerTool(
+          'get_time',
+          {
+            description: 'Get current server time in ISO format',
+            inputSchema: {},
+          },
+          async () => {
+            return {
+              content: [{ type: 'text', text: new Date().toISOString() }],
+            };
+          }
+        );
 
-        server.tool(
+        server.registerTool(
           'echo',
           {
-            text: z.string().min(1).describe('Text to echo back'),
+            description: 'Echo back the provided text',
+            inputSchema: {
+              text: z.string().min(1).describe('Text to echo back'),
+            },
           },
           async args => {
             const { text } = args;
@@ -194,27 +210,30 @@ const app = new Elysia()
         );
 
         // Advanced tool with complex validation using Zod schema
-        server.tool(
+        server.registerTool(
           'validate_user',
           {
-            user: z.object({
-              name: z
-                .string()
-                .min(2)
-                .describe('User name with at least 2 characters'),
-              email: z.string().email().describe('Valid email address'),
-              age: z.number().min(0).max(150).describe('Age between 0 and 150'),
-              preferences: z
-                .object({
-                  theme: z
-                    .enum(['light', 'dark'])
-                    .describe('UI theme preference'),
-                  notifications: z
-                    .boolean()
-                    .describe('Notification preference'),
-                })
-                .optional(),
-            }),
+            description: 'Validate user profile data',
+            inputSchema: {
+              user: z.object({
+                name: z
+                  .string()
+                  .min(2)
+                  .describe('User name with at least 2 characters'),
+                email: z.string().email().describe('Valid email address'),
+                age: z.number().min(0).max(150).describe('Age between 0 and 150'),
+                preferences: z
+                  .object({
+                    theme: z
+                      .enum(['light', 'dark'])
+                      .describe('UI theme preference'),
+                    notifications: z
+                      .boolean()
+                      .describe('Notification preference'),
+                  })
+                  .optional(),
+              }),
+            },
           },
           async args => {
             const { user } = args;
@@ -261,10 +280,51 @@ const app = new Elysia()
           }
         );
 
+        // Notification test tool demonstrating progress notifications via _meta
+        server.registerTool(
+          'notification-test',
+          {
+            description: 'Send progress notifications using _meta.progressToken',
+            inputSchema: {},
+          },
+          async (_args, extra) => {
+            const progressToken = extra._meta?.progressToken;
+            console.log(extra._meta);
+
+            if (progressToken) {
+              for (let i = 0; i <= 100; i += 10) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await extra.sendNotification({
+                  method: 'notifications/progress',
+                  params: {
+                    total: 100,
+                    progress: i,
+                    progressToken,
+                    message: 'task progress',
+                  },
+                });
+                console.log(`notification sent: ${i}`);
+              }
+            }
+
+            return {
+              isError: false,
+              content: [{
+                type: 'text',
+                text: 'Notification test'
+              }]
+            };
+          }
+        );
+
         // Register resources directly
-        server.resource(
+        server.registerResource(
           'System Information',
           'example://system-info',
+          {
+            description:
+              'Server platform, Node version, uptime, memory, and timestamp',
+          },
           async () => {
             const content = await exampleService.getSystemInfo();
             return {
@@ -279,9 +339,12 @@ const app = new Elysia()
           }
         );
 
-        server.resource(
+        server.registerResource(
           'Package Configuration',
           'file://package.json',
+          {
+            description: 'Contents of package.json',
+          },
           async () => {
             try {
               const content = await Bun.file('./package.json').text();
@@ -301,35 +364,45 @@ const app = new Elysia()
         );
 
         // Add project stats resource
-        server.resource('Project Statistics', 'project://stats', async () => {
-          const stats = await demoService.getProjectStats();
-          return {
-            contents: [
-              {
-                uri: 'project://stats',
-                mimeType: 'application/json',
-                text: JSON.stringify(stats, null, 2),
-              },
-            ],
-          };
-        });
+        server.registerResource(
+          'Project Statistics',
+          'project://stats',
+          {
+            description: 'Demo project statistics',
+          },
+          async () => {
+            const stats = await demoService.getProjectStats();
+            return {
+              contents: [
+                {
+                  uri: 'project://stats',
+                  mimeType: 'application/json',
+                  text: JSON.stringify(stats, null, 2),
+                },
+              ],
+            };
+          }
+        );
 
         // Register prompts directly - Enhanced examples following MCP best practices
-        server.prompt(
+        server.registerPrompt(
           'greeting',
-          'Generate a personalized greeting with multimedia content',
           {
-            name: z.string().describe('Name of the person to greet'),
-            time: z
-              .string()
-              .optional()
-              .describe('Time of day (morning, afternoon, evening)'),
-            includeSystemInfo: z
-              .string()
-              .optional()
-              .describe(
-                'Include system information as embedded resource (true/false)'
-              ),
+            description:
+              'Generate a personalized greeting with multimedia content',
+            argsSchema: {
+              name: z.string().describe('Name of the person to greet'),
+              time: z
+                .string()
+                .optional()
+                .describe('Time of day (morning, afternoon, evening)'),
+              includeSystemInfo: z
+                .string()
+                .optional()
+                .describe(
+                  'Include system information as embedded resource (true/false)'
+                ),
+            },
           },
           async args => {
             const result = await exampleService.generateGreeting(
@@ -368,26 +441,29 @@ const app = new Elysia()
         );
 
         // Comprehensive prompt demonstrating all PromptMessage content types
-        server.prompt(
+        server.registerPrompt(
           'multimedia-demo',
-          'Demonstrate all PromptMessage content types: text, image, audio, and embedded resources',
           {
-            includeImage: z
-              .string()
-              .optional()
-              .describe('Include sample image content (true/false)'),
-            includeAudio: z
-              .string()
-              .optional()
-              .describe('Include sample audio content (true/false)'),
-            includeResource: z
-              .string()
-              .optional()
-              .describe('Include embedded resource (true/false)'),
-            customText: z
-              .string()
-              .optional()
-              .describe('Custom text content to include'),
+            description:
+              'Demonstrate all PromptMessage content types: text, image, audio, and embedded resources',
+            argsSchema: {
+              includeImage: z
+                .string()
+                .optional()
+                .describe('Include sample image content (true/false)'),
+              includeAudio: z
+                .string()
+                .optional()
+                .describe('Include sample audio content (true/false)'),
+              includeResource: z
+                .string()
+                .optional()
+                .describe('Include embedded resource (true/false)'),
+              customText: z
+                .string()
+                .optional()
+                .describe('Custom text content to include'),
+            },
           },
           async args => {
             const messages: PromptMessage[] = [];
@@ -445,45 +521,48 @@ const app = new Elysia()
         );
 
         // Git commit message prompt following MCP documentation example
-        server.prompt(
+        server.registerPrompt(
           'git-commit',
-          'Generate a conventional commit message with optional code analysis',
           {
-            changes: z
-              .string()
-              .describe(
-                'Git diff, file changes, or description of modifications'
-              ),
-            type: z
-              .enum([
-                'feat',
-                'fix',
-                'docs',
-                'style',
-                'refactor',
-                'test',
-                'chore',
-                'build',
-                'ci',
-              ])
-              .optional()
-              .describe(
-                'Conventional commit type (auto-detected if not specified)'
-              ),
-            scope: z
-              .string()
-              .optional()
-              .describe('Commit scope (component, feature area)'),
-            breaking: z
-              .string()
-              .optional()
-              .describe('Whether this is a breaking change (true/false)'),
-            includeAnalysis: z
-              .string()
-              .optional()
-              .describe(
-                'Include code complexity analysis as embedded resource (true/false)'
-              ),
+            description:
+              'Generate a conventional commit message with optional code analysis',
+            argsSchema: {
+              changes: z
+                .string()
+                .describe(
+                  'Git diff, file changes, or description of modifications'
+                ),
+              type: z
+                .enum([
+                  'feat',
+                  'fix',
+                  'docs',
+                  'style',
+                  'refactor',
+                  'test',
+                  'chore',
+                  'build',
+                  'ci',
+                ])
+                .optional()
+                .describe(
+                  'Conventional commit type (auto-detected if not specified)'
+                ),
+              scope: z
+                .string()
+                .optional()
+                .describe('Commit scope (component, feature area)'),
+              breaking: z
+                .string()
+                .optional()
+                .describe('Whether this is a breaking change (true/false)'),
+              includeAnalysis: z
+                .string()
+                .optional()
+                .describe(
+                  'Include code complexity analysis as embedded resource (true/false)'
+                ),
+            },
           },
           async args => {
             const { changes, type, scope, breaking, includeAnalysis } = args;
